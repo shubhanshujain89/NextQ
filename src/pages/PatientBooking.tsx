@@ -159,76 +159,6 @@ export const getEarliestBookingSchedule = (doctor: Pick<Doctor, 'availableDays' 
   };
 };
 
-const fallbackClinics: Clinic[] = [
-  {
-    id: 'demo-clinic-1',
-    name: 'NEXTQ Care Clinic',
-    address: '12 Green Park, New Delhi',
-    phone: '+91 98765 43210',
-    email: 'care@nextq.in',
-    specializations: ['General Medicine', 'Dermatology', 'Pediatrics'],
-    operatingHours: 'Mon-Sat • 9:00 AM - 8:00 PM',
-  },
-  {
-    id: 'demo-clinic-2',
-    name: 'City Family Hospital',
-    address: '78 Sector 15, Noida',
-    phone: '+91 99887 66554',
-    email: 'hello@cityfamily.in',
-    specializations: ['Orthopedics', 'Cardiology', 'Neurology'],
-    operatingHours: 'Mon-Sun • 8:00 AM - 9:00 PM',
-  },
-];
-
-const fallbackDoctorsByClinic: Record<string, Doctor[]> = {
-  'demo-clinic-1': [
-    {
-      id: 'demo-doctor-1',
-      name: 'Ananya Verma',
-      specialization: 'General Medicine',
-      clinicId: 'demo-clinic-1',
-      consultationFee: 499,
-      availableDays: ['Mon', 'Tue', 'Wed', 'Thu'],
-      availableHours: '9:00 AM - 1:00 PM',
-      rating: 4.8,
-    },
-    {
-      id: 'demo-doctor-2',
-      name: 'Rohan Mehta',
-      specialization: 'Dermatology',
-      clinicId: 'demo-clinic-1',
-      consultationFee: 699,
-      availableDays: ['Fri', 'Sat'],
-      availableHours: '2:00 PM - 6:00 PM',
-      rating: 4.9,
-    },
-  ],
-  'demo-clinic-2': [
-    {
-      id: 'demo-doctor-3',
-      name: 'Nitin Kapoor',
-      specialization: 'Orthopedics',
-      clinicId: 'demo-clinic-2',
-      consultationFee: 799,
-      availableDays: ['Mon', 'Wed', 'Fri'],
-      availableHours: '10:00 AM - 4:00 PM',
-      rating: 4.7,
-    },
-    {
-      id: 'demo-doctor-4',
-      name: 'Pooja Sharma',
-      specialization: 'Cardiology',
-      clinicId: 'demo-clinic-2',
-      consultationFee: 899,
-      availableDays: ['Tue', 'Thu', 'Sat'],
-      availableHours: '11:00 AM - 5:00 PM',
-      rating: 4.9,
-    },
-  ],
-};
-
-const getDemoDoctorsForClinic = (clinicId: string) => fallbackDoctorsByClinic[clinicId] || [];
-
 export const isDuplicateBookingError = (message: string = '') =>
   /already registered for this mobile number today|already.*booked.*this.*mobile.*number|duplicate.*mobile.*number/i.test(message);
 
@@ -238,19 +168,13 @@ export const resolveLinkedBookingSelection = (
   clinicList: Clinic[],
   doctorList: Doctor[] = [],
 ) => {
-  const availableClinics = clinicList.length ? clinicList : fallbackClinics;
-  const selectedClinic = availableClinics.find((clinic) => clinic.id === linkedClinicId)
-    || fallbackClinics.find((clinic) => clinic.id === linkedClinicId)
-    || null;
+  const selectedClinic = clinicList.find((clinic) => clinic.id === linkedClinicId) || null;
 
   if (!selectedClinic) {
     return { selectedClinic: null, selectedDoctor: null, step: 'clinic' as const };
   }
 
-  const candidateDoctors = doctorList.length ? doctorList : getDemoDoctorsForClinic(selectedClinic.id);
-  const selectedDoctor = candidateDoctors.find((doctor) => doctor.id === linkedDoctorId)
-    || getDemoDoctorsForClinic(selectedClinic.id).find((doctor) => doctor.id === linkedDoctorId)
-    || null;
+  const selectedDoctor = doctorList.find((doctor) => doctor.id === linkedDoctorId) || null;
 
   if (!selectedDoctor) {
     return { selectedClinic, selectedDoctor: null, step: 'doctor' as const };
@@ -319,9 +243,9 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
               const doctorsResponse = await fetch(`/api/clinics/${encodeURIComponent(clinic.id)}/doctors`);
               const doctorsPayload = await doctorsResponse.json();
               const doctorList = (doctorsResponse.ok ? (doctorsPayload || []) as Doctor[] : []);
-              return [clinic.id, getClinicAvailabilityStatus(doctorList.length ? doctorList : getDemoDoctorsForClinic(clinic.id))];
+              return [clinic.id, getClinicAvailabilityStatus(doctorList)];
             } catch {
-              return [clinic.id, getClinicAvailabilityStatus(getDemoDoctorsForClinic(clinic.id))];
+              return [clinic.id, getClinicAvailabilityStatus()];
             }
           })
         )
@@ -335,10 +259,9 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
           const doctorsResponse = await fetch(`/api/clinics/${encodeURIComponent(linkedClinic.id)}/doctors`);
           const doctorsPayload = await doctorsResponse.json();
           const apiDoctorList = (doctorsResponse.ok ? (doctorsPayload || []) as Doctor[] : []);
-          const doctorList = apiDoctorList.length ? apiDoctorList : getDemoDoctorsForClinic(linkedClinic.id);
-          const linkedSelection = resolveLinkedBookingSelection(linkedClinicId, linkedDoctorId, availableClinics, doctorList);
+          const linkedSelection = resolveLinkedBookingSelection(linkedClinicId, linkedDoctorId, availableClinics, apiDoctorList);
           setSelectedClinic(linkedSelection.selectedClinic);
-          setDoctors(doctorList);
+          setDoctors(apiDoctorList);
           if (linkedSelection.selectedDoctor) {
             const schedule = getEarliestBookingSchedule(linkedSelection.selectedDoctor);
             setSelectedDoctor(linkedSelection.selectedDoctor);
@@ -356,32 +279,12 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
       setLoading(false);
     } catch (error) {
       console.error('Error fetching clinics:', error);
-      setClinics(fallbackClinics);
-      setClinicAvailability(
-        Object.fromEntries(
-          fallbackClinics.map((clinic) => [clinic.id, getClinicAvailabilityStatus(getDemoDoctorsForClinic(clinic.id))])
-        )
-      );
-      if (linkedClinicId && linkedDoctorId) {
-        const linkedSelection = resolveLinkedBookingSelection(linkedClinicId, linkedDoctorId, fallbackClinics, getDemoDoctorsForClinic(linkedClinicId));
-        setSelectedClinic(linkedSelection.selectedClinic);
-        setDoctors(getDemoDoctorsForClinic(linkedClinicId));
-        if (linkedSelection.selectedDoctor) {
-          const schedule = getEarliestBookingSchedule(linkedSelection.selectedDoctor);
-          setSelectedDoctor(linkedSelection.selectedDoctor);
-          setSelectedAppointmentDate(schedule?.date ?? null);
-          setSelectedAppointmentSlot(schedule?.autoSelectedSlot || schedule?.slots[0]?.value || '');
-          syncBookingSelectionUrl(linkedSelection.selectedClinic?.id || linkedClinicId, linkedSelection.selectedDoctor.id);
-        }
-        setStep(linkedSelection.step);
-      } else if (linkedClinicId) {
-        const linkedClinic = fallbackClinics.find((clinic) => clinic.id === linkedClinicId);
-        if (linkedClinic) {
-          setSelectedClinic(linkedClinic);
-          setDoctors(getDemoDoctorsForClinic(linkedClinic.id));
-          setStep('doctor');
-        }
-      }
+      setClinics([]);
+      setDoctors([]);
+      setClinicAvailability({});
+      setSelectedClinic(null);
+      setSelectedDoctor(null);
+      setStep('clinic');
       setLoading(false);
     }
   };
@@ -396,10 +299,10 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Unable to load doctors.');
       const doctorList = (payload || []) as Doctor[];
-      setDoctors(doctorList.length ? doctorList : getDemoDoctorsForClinic(clinicId));
+      setDoctors(doctorList);
     } catch (error) {
       console.error('Error fetching doctors:', error);
-      setDoctors(getDemoDoctorsForClinic(clinicId));
+      setDoctors([]);
     }
   };
 
@@ -571,9 +474,9 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
               )}
             </div>
 
-            {showClinicSearch && filteredClinics.length === 0 && (
+            {filteredClinics.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/40 px-4 py-8 text-center text-slate-400">
-                No clinics match your search.
+                {showClinicSearch ? 'No clinics match your search.' : 'No clinics are currently available for booking.'}
               </div>
             )}
 

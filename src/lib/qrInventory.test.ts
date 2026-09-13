@@ -12,6 +12,8 @@ test('QR code values are normalized to NEXTQ identifiers', () => {
 test('QR inventory status values normalize to supported states', () => {
   assert.equal(normalizeQrStatus('UNASSIGNED'), 'AVAILABLE');
   assert.equal(normalizeQrStatus('ASSIGNED'), 'ASSIGNED');
+  assert.equal(normalizeQrStatus('AVAILABLE', 'doctor-42'), 'ASSIGNED');
+  assert.equal(normalizeQrStatus('DISABLED', 'doctor-42'), 'DISABLED');
   assert.equal(normalizeQrStatus('disabled'), 'DISABLED');
 });
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { getDoctorQueueAction } from './doctorQueueLogic.js';
 import { getAverageWaitSummary } from './waitMetrics.js';
-import { makeDoctorBookingQrCodeUrl, extractBookingTokenNumber } from '../lib/doctorQr.js';
+import { makeDoctorBookingUrl, extractBookingTokenNumber } from '../lib/doctorQr.js';
 import { resolveLinkedBookingSelection, isDuplicateBookingError } from '../pages/PatientBooking.js';
 
 test('doctor queue action is CALL_NEXT when no consultation is active but a patient is waiting', () => {
@@ -34,11 +34,8 @@ test('doctor queue action is COMPLETE_ONLY when no next patient is waiting', () 
 });
 
 test('doctor QR booking URLs stay clinic-specific and doctor-specific', () => {
-  const qr = makeDoctorBookingQrCodeUrl('clinic-001', 'doctor-42', 'https://example.com');
-  assert.equal(qr.startsWith('https://api.qrserver.com/v1/create-qr-code/?'), true);
-  assert.match(qr, /clinic-001/);
-  assert.match(qr, /doctor-42/);
-  assert.match(qr, /booking%3FclinicId%3Dclinic-001%26doctorId%3Ddoctor-42/);
+  const bookingUrl = makeDoctorBookingUrl('clinic-001', 'doctor-42', 'https://example.com');
+  assert.equal(bookingUrl, 'https://example.com/booking?clinicId=clinic-001&doctorId=doctor-42');
 });
 
 test('patient booking payloads surface the generated token number for the confirmation screen', () => {

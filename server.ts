@@ -1,4 +1,5 @@
 import express from 'express';
+import * as QRCode from 'qrcode';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -10,6 +11,8 @@ import { getClinicPlanSnapshot, getPlanLimits } from './server/db/services/planS
 import { getClinicBusinessDate } from './server/db/services/clinicTime.js';
 import { validateSessionSecret, validateSuperAdminBootstrapPassword } from './server/bootstrap.js';
 import { canAccessRecord, canMutateGenericRecord, prepareDatabaseMutation, requireDatabaseAccess, sanitizeDatabaseRecord } from './server/auth/authorization.js';
+import { classifyRateLimitCount, type RateLimitStatus } from './server/rateLimit.js';
+import { normalizeQrStatus } from './src/lib/qrInventory.js';
 
 dotenv.config();
 
@@ -95,7 +98,7 @@ app.use((_req, res, next) => {
   next();
 });
 
-const checkRateLimit = async (key: string, max = RATE_LIMIT_MAX): Promise<{ allowed: boolean; status: 'ok' | 'rate_limited' | 'unavailable' }> => {
+const checkRateLimit = async (key: string, max = RATE_LIMIT_MAX): Promise<{ allowed: boolean; status: RateLimitStatus }> => {
   try {
     await rateLimitTableReady;
     await executeQueryOne(
@@ -110,10 +113,8 @@ const checkRateLimit = async (key: string, max = RATE_LIMIT_MAX): Promise<{ allo
       'SELECT request_count FROM rate_limits WHERE rate_key = ?',
       [key]
     );
-    const requestCount = Number(record?.request_count || 0);
-    return requestCount > max
-      ? { allowed: false, status: 'rate_limited' }
-      : { allowed: true, status: 'ok' };
+    const status = classifyRateLimitCount(record?.request_count, max);
+    return { allowed: status === 'ok', status };
   } catch (error) {
     console.error('Rate limit storage unavailable:', error instanceof Error ? error.message : error);
     return { allowed: false, status: 'unavailable' };
@@ -465,7 +466,7 @@ app.get('/api/staff/queue/:clinicId', async (req, res) => {
         whatsappNotificationsEnabled: clinic.whatsappNotificationsEnabled,
         hasPaymentGateway: clinic.hasPaymentGateway,
         clinicUpiId: clinic.clinicUpiId || '',
-        qrCodeUrl: makeDoctorBookingQrCodeUrl(req, clinic.id, doctorIdForQr || ''),
+        qrCodeUrl: await makeDoctorBookingQrCodeUrl(req, clinic.id, doctorIdForQr || ''),
       },
       session: session ? {
         id: session.id,
@@ -603,21 +604,13 @@ app.post('/api/staff/queue/:tokenId/complete', async (req, res) => {
   }
 });
 
-const makeDoctorBookingQrCodeUrl = (req: express.Request, clinicId: string, doctorId: string) => {
+const makeDoctorBookingQrCodeUrl = async (req: express.Request, clinicId: string, doctorId: string) => {
   if (!clinicId || !doctorId) return '';
   const protocol = req.protocol || 'http';
   const host = req.get('host') || 'localhost:3000';
   const baseUrl = `${protocol}://${host}`;
   const bookingUrl = `${baseUrl}/booking?clinicId=${encodeURIComponent(clinicId)}&doctorId=${encodeURIComponent(doctorId)}`;
-  const encodedBookingUrl = encodeURIComponent(bookingUrl);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodedBookingUrl}`;
-};
-
-const normalizeQrInventoryStatus = (value: unknown): 'AVAILABLE' | 'ASSIGNED' | 'DISABLED' => {
-  const nextValue = String(value ?? '').trim().toUpperCase();
-  if (nextValue === 'ASSIGNED') return 'ASSIGNED';
-  if (nextValue === 'DISABLED') return 'DISABLED';
-  return 'AVAILABLE';
+  return QRCode.toDataURL(bookingUrl, { width: 220, margin: 1, errorCorrectionLevel: 'M' });
 };
 
 const parseBarcodeInventoryRecord = (record: any) => {
@@ -627,7 +620,7 @@ const parseBarcodeInventoryRecord = (record: any) => {
       ...payload,
       id: record.id,
       barcodeValue: String(payload.barcodeValue || '').toUpperCase(),
-      status: normalizeQrInventoryStatus(payload.status || (payload.assignedDoctorId ? 'ASSIGNED' : 'AVAILABLE')),
+      status: normalizeQrStatus(payload.assignedDoctorId ? 'ASSIGNED' : payload.status),
     };
   } catch {
     return null;
@@ -1154,7 +1147,7 @@ app.get('/api/barcodes', async (req, res) => {
     const records = await repositories.settings.findAll({ where: { category: 'barcode_inventory' }, orderBy: 'updated_at', orderDirection: 'DESC' });
     const inventory = records.flatMap((record) => {
       const parsed = parseBarcodeInventoryRecord(record);
-      return parsed ? [{ ...parsed, status: normalizeQrInventoryStatus(parsed.status) }] : [];
+      return parsed ? [{ ...parsed, status: normalizeQrStatus(parsed.status, parsed.assignedDoctorId) }] : [];
     });
     res.status(200).json(inventory);
   } catch (error) {
@@ -1192,7 +1185,7 @@ app.post('/api/barcodes', async (req, res) => {
       barcodeValue,
       label,
       notes: String(req.body?.notes || '').trim(),
-      status: normalizeQrInventoryStatus(req.body?.status || 'AVAILABLE'),
+      status: normalizeQrStatus(req.body?.status),
       assignedDoctorId: null,
       assignedDoctorName: null,
       assignedClinicId: null,
@@ -1228,7 +1221,7 @@ app.patch('/api/barcodes/:barcodeId', async (req, res) => {
     }
 
     const current = parseBarcodeInventoryRecord(record) || JSON.parse(record.value || '{}');
-    const requestedStatus = normalizeQrInventoryStatus(req.body?.status || current.status || 'AVAILABLE');
+    const requestedStatus = normalizeQrStatus(req.body?.status || current.status);
     const doctorId = req.body?.assignedDoctorId ? String(req.body.assignedDoctorId) : '';
 
     let assignment = {
@@ -1270,6 +1263,10 @@ app.patch('/api/barcodes/:barcodeId', async (req, res) => {
         status: 'ASSIGNED',
       };
     } else if (requestedStatus === 'ASSIGNED') {
+      if (!current.assignedDoctorId) {
+        res.status(409).json({ error: 'An assigned doctor is required for an assigned QR code.' });
+        return;
+      }
       assignment = {
         assignedDoctorId: current.assignedDoctorId || null,
         assignedDoctorName: current.assignedDoctorName || null,

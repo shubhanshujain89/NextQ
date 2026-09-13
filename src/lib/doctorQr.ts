@@ -1,11 +1,9 @@
-export const makeDoctorBookingQrCodeUrl = (
+export const makeDoctorBookingUrl = (
   clinicId: string,
   doctorId: string,
   baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'
 ): string => {
-  const bookingUrl = `${baseUrl.replace(/\/$/, '')}/booking?clinicId=${encodeURIComponent(clinicId)}&doctorId=${encodeURIComponent(doctorId)}`;
-  const encodedBookingUrl = encodeURIComponent(bookingUrl);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodedBookingUrl}`;
+  return `${baseUrl.replace(/\/$/, '')}/booking?clinicId=${encodeURIComponent(clinicId)}&doctorId=${encodeURIComponent(doctorId)}`;
 };
 
 export const extractBookingTokenNumber = (

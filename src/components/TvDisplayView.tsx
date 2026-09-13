@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as QRCode from 'qrcode';
 import {
   Tv,
   Maximize2,
@@ -11,7 +12,7 @@ import {
 import { Clinic, TokenItem, QueueSession } from '../types/queue';
 import { soundManager } from '../lib/audio';
 import { formatDoctorName } from '../lib/doctorName';
-import { makeDoctorBookingQrCodeUrl } from '../lib/doctorQr';
+import { makeDoctorBookingUrl } from '../lib/doctorQr';
 
 interface TvDisplayViewProps {
   clinic: Clinic;
@@ -77,7 +78,26 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
 
   const isDoctorIn = clinic.doctorStatus === 'IN';
   const bookingHref = `/booking?clinicId=${encodeURIComponent(clinic.id)}&doctorId=${encodeURIComponent(clinic.doctorId || '')}`;
-  const generatedBookingQr = makeDoctorBookingQrCodeUrl(clinic.id, clinic.doctorId || '');
+  const bookingUrl = makeDoctorBookingUrl(clinic.id, clinic.doctorId || '');
+  const [generatedBookingQr, setGeneratedBookingQr] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setGeneratedBookingQr('');
+    if (!clinic.doctorId) return undefined;
+
+    void QRCode.toDataURL(bookingUrl, { width: 220, margin: 1, errorCorrectionLevel: 'M' })
+      .then((dataUrl) => {
+        if (active) setGeneratedBookingQr(dataUrl);
+      })
+      .catch(() => {
+        if (active) setGeneratedBookingQr('');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [bookingUrl, clinic.doctorId]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-between overflow-hidden bg-[radial-gradient(circle_at_15%_15%,rgba(20,184,166,0.16),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(59,130,246,0.12),transparent_30%),#020817] p-4 text-white select-none sm:p-7 lg:p-9 font-sans">

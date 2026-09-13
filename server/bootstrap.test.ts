@@ -25,11 +25,29 @@ test('rejects missing production session secret', () => {
 });
 
 test('accepts a production session secret when present', () => {
-  assert.equal(validateSessionSecret('very-long-production-secret', 'production'), null);
+  assert.equal(validateSessionSecret('a-strong-production-session-secret-32', 'production'), null);
+});
+
+test('rejects short production session secrets', () => {
+  assert.equal(
+    validateSessionSecret('session-secret', 'production'),
+    'SESSION_SECRET must be at least 32 characters in production.'
+  );
+});
+
+test('rejects the development session secret in production', () => {
+  assert.equal(
+    validateSessionSecret('nextq-development-session-secret', 'production'),
+    'SESSION_SECRET must not use the development default in production.'
+  );
+});
+
+test('ignores the production minimum outside production', () => {
+  assert.equal(validateSessionSecret('session-secret', 'development'), null);
 });
 
 test('auth transitions keep a logged-in clinic admin on the admin dashboard', () => {
   const redirectPath = '/site/admin';
   assert.equal(redirectPath, '/site/admin');
-  assert.equal(validateSessionSecret('session-secret', 'production'), null);
+  assert.equal(validateSessionSecret('a-strong-production-session-secret-32', 'production'), null);
 });

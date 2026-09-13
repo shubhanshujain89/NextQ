@@ -12,10 +12,11 @@ export const normalizeQrCodeValue = (value: string | null | undefined): string =
   return normalized.length > 16 ? normalized.slice(0, 16) : normalized;
 };
 
-export const normalizeQrStatus = (value?: string | null): QrInventoryStatus => {
+export const normalizeQrStatus = (value?: string | null, assignedDoctorId?: string | null): QrInventoryStatus => {
   const normalized = String(value ?? '').trim().toUpperCase();
-  if (normalized === 'ASSIGNED') return 'ASSIGNED';
   if (normalized === 'DISABLED') return 'DISABLED';
+  if (normalized === 'ASSIGNED') return 'ASSIGNED';
+  if (String(assignedDoctorId ?? '').trim()) return 'ASSIGNED';
   return 'AVAILABLE';
 };
 

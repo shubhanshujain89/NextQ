@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as QRCode from 'qrcode';
 import { Building2, Plus, Edit, Trash2, Users, Clock, Search, Filter, Barcode, Link2, Unlink, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, auth, onAuthStateChanged, recordAuditEvent, hashPassword } from '../lib/firebase';
 import { defaultContentSections, defaultSiteSettings, loadContentSections, loadSiteSettings, saveContentSections, saveSiteSettings, initializeSiteConfig, loadSiteSettingsFromDatabase, loadContentSectionsFromDatabase } from '../lib/siteConfig';
@@ -32,12 +33,28 @@ interface InventoryDoctor {
 
 const BarcodePreview: React.FC<{ value: string }> = ({ value }) => {
   const qrUrl = buildQrPublicUrl(value);
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}`;
+  const [qrImageUrl, setQrImageUrl] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setQrImageUrl('');
+    void QRCode.toDataURL(qrUrl, { width: 220, margin: 1, errorCorrectionLevel: 'M' })
+      .then((dataUrl) => {
+        if (active) setQrImageUrl(dataUrl);
+      })
+      .catch(() => {
+        if (active) setQrImageUrl('');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [qrUrl]);
 
   return (
     <div className="rounded-lg bg-white px-3 py-2">
       <div className="flex h-40 items-center justify-center overflow-hidden">
-        <img src={qrImageUrl} alt={`QR code for ${qrUrl}`} className="h-40 w-40 object-contain" />
+        {qrImageUrl ? <img src={qrImageUrl} alt={`QR code for ${qrUrl}`} className="h-40 w-40 object-contain" /> : <span className="text-xs text-slate-400">Generating QR...</span>}
       </div>
     </div>
   );
@@ -639,7 +656,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
     }
   };
 
-  const printBarcode = (barcodeValue: string) => {
+  const printBarcode = async (barcodeValue: string) => {
     const popup = window.open('', '_blank', 'width=480,height=640');
     if (!popup) {
       window.alert('Please allow pop-ups to print the barcode.');
@@ -648,7 +665,14 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
 
     const code = normalizeCode39Value(barcodeValue);
     const qrUrl = buildQrPublicUrl(code);
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrUrl)}`;
+    let qrImageUrl: string;
+    try {
+      qrImageUrl = await QRCode.toDataURL(qrUrl, { width: 420, margin: 1, errorCorrectionLevel: 'M' });
+    } catch {
+      popup.close();
+      window.alert('Unable to generate the QR code for printing.');
+      return;
+    }
     const logoUrl = new URL('/nextq-logo.png', window.location.origin).href;
 
     popup.document.write(`<!doctype html><html><head><title>${code} - NEXTQ</title><style>

@@ -161,13 +161,6 @@ export const buildJsonLd = (pathname: string) => {
     url: NEXTQ_SITE_URL,
     logo: NEXTQ_LOGO_URL,
     description: meta.description,
-    sameAs: [
-      'https://www.linkedin.com/company/nextq',
-      'https://www.facebook.com/nextq',
-      'https://www.instagram.com/nextq',
-      'https://x.com/nextq',
-      'https://www.youtube.com/@nextq',
-    ],
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'sales',
@@ -181,16 +174,10 @@ export const buildJsonLd = (pathname: string) => {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'NEXTQ',
-    applicationCategory: 'Healthcare',
+    applicationCategory: 'HealthApplication',
     operatingSystem: 'Web',
     description: meta.description,
     url: NEXTQ_SITE_URL,
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'INR',
-      price: '0',
-      availability: 'https://schema.org/InStock',
-    },
     featureList: [
       'Clinic booking',
       'Patient token tracking',

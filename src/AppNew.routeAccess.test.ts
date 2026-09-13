@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolveAppPageForRoute } from './AppNew';
 import { buildTrackingHref } from './lib/trackingLink';
-import { getRouteMetadata, isNoIndexRoute } from './lib/seo';
+import { buildJsonLd, getRouteMetadata, isNoIndexRoute } from './lib/seo';
 import { auth, onAuthStateChanged } from './lib/firebase';
 import { canAccessRecord, canMutateGenericRecord, prepareDatabaseMutation } from '../server/auth/authorization';
 
@@ -64,6 +64,21 @@ test('booking and tracking pages have public SEO metadata coverage', () => {
   assert.equal(getRouteMetadata('/track/123').robots, 'noindex,follow');
   assert.equal(getRouteMetadata('/site/admin').robots, 'noindex,follow');
   assert.equal(isNoIndexRoute('/site/admin'), true);
+});
+
+test('software application schema uses a supported category without an unverified free price', () => {
+  const schema = buildJsonLd('/') as { '@graph': Array<Record<string, unknown>> };
+  const softwareApplication = schema['@graph'].find((entry) => entry['@type'] === 'SoftwareApplication');
+
+  assert.equal(softwareApplication?.applicationCategory, 'HealthApplication');
+  assert.equal('offers' in (softwareApplication || {}), false);
+});
+
+test('organization schema does not advertise unverified social profiles', () => {
+  const schema = buildJsonLd('/') as { '@graph': Array<Record<string, unknown>> };
+  const organization = schema['@graph'].find((entry) => entry['@type'] === 'Organization');
+
+  assert.equal('sameAs' in (organization || {}), false);
 });
 
 test('auth transitions keep clinic-admin users on the protected dashboard route', () => {
