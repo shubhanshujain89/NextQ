@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { getDoctorQueueAction } from './doctorQueueLogic.js';
 import { getAverageWaitSummary } from './waitMetrics.js';
 import { makeDoctorBookingUrl, extractBookingTokenNumber } from '../lib/doctorQr.js';
-import { resolveLinkedBookingSelection, isDuplicateBookingError } from '../pages/PatientBooking.js';
+import { getEarliestBookingSchedule, resolveLinkedBookingSelection, isDuplicateBookingError } from '../pages/PatientBooking.js';
 
 test('doctor queue action is CALL_NEXT when no consultation is active but a patient is waiting', () => {
   const action = getDoctorQueueAction({
@@ -81,6 +81,13 @@ test('direct booking links resolve straight to the appointment details step', ()
   assert.equal(result.step, 'booking');
   assert.equal(result.selectedClinic?.id, 'demo-clinic-1');
   assert.equal(result.selectedDoctor?.id, 'demo-doctor-1');
+});
+
+test('doctors unavailable today cannot produce a booking schedule', () => {
+  assert.equal(getEarliestBookingSchedule({
+    availableDays: ['never'],
+    availableHours: '10:00 AM - 11:00 AM',
+  }), null);
 });
 
 test('duplicate mobile-number booking errors do not trigger a fake local token', () => {

@@ -327,9 +327,13 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
 
   const handleDoctorSelect = (doctor: Doctor) => {
     const schedule = getEarliestBookingSchedule(doctor);
+    if (!schedule) {
+      window.alert('This doctor has no appointments available today.');
+      return;
+    }
     setSelectedDoctor(doctor);
-    setSelectedAppointmentDate(schedule?.date ?? null);
-    setSelectedAppointmentSlot(schedule?.autoSelectedSlot || schedule?.slots[0]?.value || '');
+    setSelectedAppointmentDate(schedule.date);
+    setSelectedAppointmentSlot(schedule.autoSelectedSlot || schedule.slots[0]?.value || '');
     syncBookingSelectionUrl(selectedClinic?.id || doctor.clinicId, doctor.id);
     setStep('booking');
   };
@@ -597,7 +601,8 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
                   <button
                     key={doctor.id}
                     onClick={() => handleDoctorSelect(doctor)}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md group"
+                    disabled={!getEarliestBookingSchedule(doctor)}
+                    className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 disabled:hover:border-slate-200 disabled:hover:shadow-sm"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -615,7 +620,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
                         <Clock className="w-4 h-4 text-emerald-400" />
                         {doctor.availableHours}
                       </div>
-                      <p>{doctor.availableDays?.slice(0, 3).join(', ')}{doctor.availableDays?.length > 3 ? ', +more' : ''}</p>
+                        <p>{getEarliestBookingSchedule(doctor) ? `${doctor.availableDays?.slice(0, 3).join(', ')}${doctor.availableDays?.length > 3 ? ', +more' : ''}` : 'Not available today'}</p>
                     </div>
 
                   </button>
