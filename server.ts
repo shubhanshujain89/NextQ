@@ -9,8 +9,10 @@ import { repositories } from './server/db/repositories/index.js';
 import { services } from './server/db/services/index.js';
 import { getClinicPlanSnapshot, getPlanLimits } from './server/db/services/planService.js';
 import { getClinicBusinessDate } from './server/db/services/clinicTime.js';
+import { isValidTrackingId } from './server/db/services/trackingService.js';
 import { validateSessionSecret, validateSuperAdminBootstrapPassword } from './server/bootstrap.js';
 import { canAccessRecord, canMutateGenericRecord, prepareDatabaseMutation, requireDatabaseAccess, sanitizeDatabaseRecord } from './server/auth/authorization.js';
+import { serializeStaffQueueToken } from './server/auth/responsePolicy.js';
 import { classifyRateLimitCount, type RateLimitStatus } from './server/rateLimit.js';
 
 dotenv.config();
@@ -266,6 +268,7 @@ const databaseMutationErrorStatus = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   return /plan allows|subscription is|not enabled for the current launch plans|Clinic not found/i.test(message) ? 403 : 500;
 };
+
 const serverTableMap: Record<string, string> = {
   clinics: 'clinics', doctors: 'doctors', users: 'staff_users', staff_users: 'staff_users', staff: 'staff_users',
   patients: 'patients', sessions: 'sessions', queue_sessions: 'sessions', appointments: 'appointments',
@@ -512,40 +515,7 @@ app.get('/api/staff/queue/:clinicId', async (req, res) => {
         completedCount: session.completedCount,
         totalRevenue: session.totalRevenue,
       } : null,
-      tokens: tokens.map((token) => ({
-        id: token.id,
-        clinicId: token.clinicId,
-        sessionId: token.sessionId,
-        tokenNumber: token.tokenNumber,
-        sequenceNumber: token.sequenceNumber,
-        scheduledSlot: token.scheduledSlot,
-        patientId: token.patientId,
-        patientName: token.patientName,
-        patientPhone: token.patientPhone,
-        patientAge: token.patientAge,
-        patientGender: token.patientGender,
-        tokenType: token.tokenType,
-        status: token.status,
-        isEmergency: token.isEmergency,
-        isHold: token.isHold,
-        priority: token.priority,
-        amountPaid: token.amountPaid,
-        paymentMode: token.paymentMode,
-        paymentMethod: token.paymentMethod,
-        paymentStatus: token.paymentStatus,
-        createdAt: token.createdAt.toISOString(),
-        calledAt: token.calledAt?.toISOString(),
-        completedAt: token.completedAt?.toISOString(),
-        consultationDurationSeconds: token.consultationDurationSeconds,
-        preConsultationNotes: token.preConsultationNotes,
-        weight: token.weight,
-        temperature: token.temperature,
-        bloodPressure: token.bloodPressure,
-        triageNotes: token.triageNotes,
-        doctorNotes: token.doctorNotes,
-        whatsappSentCount: token.whatsappSentCount,
-        whatsappLastSentAt: token.whatsappLastSentAt?.toISOString(),
-      })),
+      tokens: tokens.map((token) => serializeStaffQueueToken(token, context.role)),
     });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to load queue.' });
@@ -587,6 +557,40 @@ app.patch('/api/staff/queue/:tokenId/payment', async (req, res) => {
     res.status(200).json(token);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to update payment status.' });
+  }
+});
+
+app.patch('/api/staff/queue/:tokenId/details', async (req, res) => {
+  try {
+    const context = await queueMutationContext(req, res);
+    if (!context) return;
+    const tokenId = String(req.params.tokenId || '');
+    const token = await repositories.tokens.findById(tokenId);
+    if (!token || token.clinicId !== context.clinicId || (context.role === 'DOCTOR' && token.doctorId !== context.doctorId)) {
+      res.status(404).json({ error: 'Token not found.' });
+      return;
+    }
+
+    const body = req.body || {};
+    const updates: Record<string, unknown> = {};
+    const allowedFields = ['patientName', 'patientPhone', 'patientAge', 'patientGender', 'weight', 'temperature', 'oxygenSaturation', 'bloodPressure', 'triageNotes', 'preConsultationNotes', 'doctorNotes'];
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updates[field] = body[field];
+    }
+    if (context.role !== 'DOCTOR') delete updates.doctorNotes;
+    if (!Object.keys(updates).length) {
+      res.status(400).json({ error: 'No editable token details were provided.' });
+      return;
+    }
+
+    const updatedToken = await repositories.tokens.update(tokenId, updates as any);
+    if (!updatedToken) {
+      res.status(404).json({ error: 'Token not found.' });
+      return;
+    }
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to update token details.' });
   }
 });
 
@@ -909,16 +913,23 @@ app.post('/api/patient/track', async (req, res) => {
       return;
     }
     res.setHeader('Cache-Control', 'no-store');
+    const trackingId = String(req.body?.trackingId || '').trim();
     const mobile = String(req.body?.mobile || '').replace(/\D/g, '').replace(/^91/, '').slice(-10);
-    if (!/^\d{10}$/.test(mobile)) {
+    if (!trackingId && !/^\d{10}$/.test(mobile)) {
       res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' });
       return;
     }
-    const phoneKey = crypto.createHash('sha256').update(mobile).digest('hex');
-    if (!(await enforceRateLimit(res, `patient-track-phone:${phoneKey}`, 10))) {
+    if (trackingId && !isValidTrackingId(trackingId)) {
+      res.status(400).json({ error: 'Invalid tracking link.' });
       return;
     }
-    const tracking = await services.tracking.getPublicTrackingByPhone(mobile);
+    const trackingKey = crypto.createHash('sha256').update(trackingId || mobile).digest('hex');
+    if (!(await enforceRateLimit(res, `patient-track:${trackingKey}`, 10))) {
+      return;
+    }
+    const tracking = trackingId
+      ? await services.tracking.getPublicTrackingByTrackingId(trackingId)
+      : await services.tracking.getPublicTrackingByPhone(mobile);
     if (!tracking) {
       res.status(404).json({ error: 'No booking found for this mobile number today.' });
       return;

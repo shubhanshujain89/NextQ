@@ -239,6 +239,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
   const [selectedAppointmentDate, setSelectedAppointmentDate] = useState<Date | null>(null);
   const [selectedAppointmentSlot, setSelectedAppointmentSlot] = useState<string>('');
   const [generatedTokenNumber, setGeneratedTokenNumber] = useState('');
+  const [generatedTrackingId, setGeneratedTrackingId] = useState('');
   const [, setScheduleClock] = useState(() => Date.now());
   
   const [bookingData, setBookingData] = useState({
@@ -409,7 +410,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
         }),
       });
       const responseText = await response.text();
-      let payload: { tokenId?: string; tokenNumber?: string; error?: string } = {};
+      let payload: { tokenId?: string; tokenNumber?: string; trackingId?: string; error?: string } = {};
       if (responseText.trim()) {
         try {
           payload = JSON.parse(responseText) as typeof payload;
@@ -419,6 +420,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
       }
       if (!response.ok) throw new Error(payload.error || `Unable to book appointment (${response.status}).`);
       setGeneratedTokenNumber(payload.tokenNumber || '');
+      setGeneratedTrackingId(payload.trackingId || '');
       setStep('confirm');
     } catch (error) {
       console.error('Error booking appointment:', error);

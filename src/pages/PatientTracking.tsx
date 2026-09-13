@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 const getTrackingMobileFromQuery = () => {
   const params = new URLSearchParams(window.location.search);
-  const mobile = params.get('mobile') || '';
-  return mobile.replace(/\D/g, '').slice(0, 10);
+  return params.get('mobile') || '';
 };
 
 interface TrackingData {
@@ -133,17 +132,13 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
                   Track your turn
                 </h1>
                 <p className="mt-3 text-lg text-slate-700 sm:text-xl">
-                  Enter the mobile number used for your booking to see your live queue status.
+                  Enter the tracking ID from your booking confirmation to see your live queue status.
                 </p>
               </div>
 
               <div className="flex min-h-[76px] overflow-hidden rounded-[16px] border border-emerald-200 bg-white shadow-[0_10px_24px_rgba(28,38,46,0.05)] ring-1 ring-emerald-100 transition focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-200">
-                <span className="flex w-[88px] items-center justify-center border-r border-emerald-200 bg-[linear-gradient(180deg,#e2f7f4_0%,#d4f0ee_100%)] text-lg font-semibold text-slate-800">
-                  +91
-                </span>
                 <input
-                  type="tel"
-                  inputMode="numeric"
+                  type="text"
                   value={mobile.replace(/\D/g, '').slice(0, 10)}
                   onChange={(event) => setMobile(event.target.value.replace(/\D/g, '').slice(0, 10))}
                   className="w-full border-0 bg-transparent px-5 text-[1.1rem] text-slate-800 placeholder:text-slate-400 focus:outline-none"

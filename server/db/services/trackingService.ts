@@ -29,14 +29,16 @@ export const calculatePatientsAhead = (
   currentSequenceNumber: number,
 ): number => tokens.filter((token) => token.status === 'WAITING' && token.sequenceNumber < currentSequenceNumber).length;
 
+export const isValidTrackingId = (trackingId: string): boolean => /^(?=.*[A-Za-z_-])[A-Za-z0-9_-]{8,128}$/.test(String(trackingId || '').trim());
+
 export class TrackingService {
   /**
    * Get public tracking information using the patient's mobile number.
    * This endpoint intentionally returns queue status only.
    */
-  async getPublicTrackingByPhone(phone: string): Promise<TrackingResult | null> {
-    const normalizedPhone = phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
-    if (!/^\d{10}$/.test(normalizedPhone)) {
+  async getPublicTrackingByTrackingId(trackingId: string): Promise<TrackingResult | null> {
+    const normalizedTrackingId = String(trackingId || '').trim();
+    if (!isValidTrackingId(normalizedTrackingId)) {
       return null;
     }
 
@@ -67,11 +69,11 @@ export class TrackingService {
       JOIN clinics c ON c.id = t.clinic_id
       JOIN doctors d ON d.id = t.doctor_id
       LEFT JOIN appointments a ON a.tracking_id = p.tracking_id
-      WHERE (p.phone = ? OR p.phone = ? OR p.phone = ?)
+      WHERE p.tracking_id = ?
       ORDER BY p.created_at DESC LIMIT 20
     `;
 
-    const candidates = await executeQuery<any>(sql, [normalizedPhone, `+91${normalizedPhone}`, `91${normalizedPhone}`]);
+    const candidates = await executeQuery<any>(sql, [normalizedTrackingId]);
     const result = candidates.find((candidate) =>
       getClinicBusinessDate(new Date(candidate.session_date), candidate.timezone) === getClinicBusinessDate(new Date(), candidate.timezone)
     );
@@ -176,6 +178,19 @@ export class TrackingService {
       appointmentDate,
       currentlyServingToken: servingResult?.token_number || undefined,
     };
+  }
+
+  async getPublicTrackingByPhone(phone: string): Promise<TrackingResult | null> {
+    const normalizedPhone = phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) return null;
+    const candidates = await executeQuery<any>(
+      `SELECT p.tracking_id FROM patients p
+       WHERE p.phone IN (?, ?, ?)
+       ORDER BY p.created_at DESC LIMIT 20`,
+      [normalizedPhone, `+91${normalizedPhone}`, `91${normalizedPhone}`]
+    );
+    const currentBooking = candidates.find((candidate) => candidate.tracking_id);
+    return currentBooking ? this.getPublicTrackingByTrackingId(currentBooking.tracking_id) : null;
   }
 }
 

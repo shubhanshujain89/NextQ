@@ -400,6 +400,13 @@ export class QueueService {
       const token = (tokenRows as any[])[0];
       if (!token || (doctorId && token.doctor_id !== doctorId) || token.status !== 'WAITING') return null;
 
+      // Serialize calls for this doctor. Locking the doctor row also covers the
+      // no-active-token case, where a token-row lock alone cannot prevent a race.
+      await connection.execute(
+        'SELECT id FROM `doctors` WHERE id = ? AND clinic_id = ? FOR UPDATE',
+        [token.doctor_id, clinicId]
+      );
+
       const [activeRows] = await connection.execute(
         `SELECT id FROM \`tokens\`
          WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?

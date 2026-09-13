@@ -23,7 +23,7 @@ import {
   Save
 } from 'lucide-react';
 import { Clinic, TokenItem, QueueSession } from '../types/queue';
-import { db, doc, updateDoc } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { soundManager } from '../lib/audio';
 import { getAverageWaitSummary } from './waitMetrics';
 
@@ -120,13 +120,17 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
         lastEditedBy: 'RECEPTIONIST' as const,
       };
 
-      await updateDoc(doc(db, 'tokens', vitalsToken.id), {
-        weight: formattedWeight,
-        temperature: formattedTemp,
-        oxygenSaturation: formattedSpO2,
-        bloodPressure: formattedBp,
-        preConsultationNotes: updatedPreNotes,
+      const response = await fetch(`/api/staff/queue/${encodeURIComponent(vitalsToken.id)}/details`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weight: formattedWeight, temperature: formattedTemp, oxygenSaturation: formattedSpO2,
+          bloodPressure: formattedBp, preConsultationNotes: updatedPreNotes,
+        }),
       });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to update patient vitals.');
 
       showToast(`Vitals saved for #${vitalsToken.tokenNumber} (${vitalsToken.patientName})`);
       setVitalsToken(null);

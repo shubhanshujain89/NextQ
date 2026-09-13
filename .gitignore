@@ -49,3 +49,7 @@ Thumbs.db
 *.tmp
 .cache/
 
+# Local SEO/export output
+robots.out
+sitemap.out
+

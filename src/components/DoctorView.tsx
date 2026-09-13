@@ -25,7 +25,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Clinic, TokenItem, QueueSession } from '../types/queue';
-import { db, doc, updateDoc, collection, setDoc } from '../lib/firebase';
+import { db, doc, collection, setDoc } from '../lib/firebase';
 import type { User } from '../lib/firebase';
 import { soundManager } from '../lib/audio';
 import { getDoctorQueueAction } from './doctorQueueLogic';
@@ -202,18 +202,19 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
         submittedAt: editingToken.preConsultationNotes?.submittedAt || new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, 'tokens', editingToken.id), {
-        patientName: editName.trim(),
-        patientPhone: editPhone.trim(),
-        patientAge: Number(editAge) || undefined,
-        patientGender: editGender,
-        weight: formattedWeight,
-        temperature: formattedTemp,
-        oxygenSaturation: formattedSpO2,
-        bloodPressure: formattedBp,
-        triageNotes: editNotes.trim() || undefined,
-        preConsultationNotes: updatedPreNotes,
+      const response = await fetch(`/api/staff/queue/${encodeURIComponent(editingToken.id)}/details`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientName: editName.trim(), patientPhone: editPhone.trim(), patientAge: Number(editAge) || undefined,
+          patientGender: editGender, weight: formattedWeight, temperature: formattedTemp,
+          oxygenSaturation: formattedSpO2, bloodPressure: formattedBp,
+          triageNotes: editNotes.trim() || undefined, preConsultationNotes: updatedPreNotes,
+        }),
       });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to update patient details.');
 
       showToast(`Updated details & symptoms for #${editingToken.tokenNumber} (${editName})`);
       setEditingToken(null);

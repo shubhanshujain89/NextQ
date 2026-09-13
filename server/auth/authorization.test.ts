@@ -48,7 +48,7 @@ test('staff users cannot perform admin-only mutations and clinic admins cannot a
   const clinicAdminContext = { userId: 'ca-1', role: 'CLINIC_ADMIN', clinicId: 'clinic-a', doctorId: null, email: 'admin@clinic-a.test' } as const;
 
   assert.equal(canMutateGenericRecord(staffContext, 'staff_users'), false);
-  assert.equal(canMutateGenericRecord(clinicAdminContext, 'patients'), true);
+  assert.equal(canMutateGenericRecord(clinicAdminContext, 'patients'), false);
   assert.throws(() => prepareDatabaseMutation(clinicAdminContext, 'staff_users', { clinicId: 'clinic-b', role: 'STAFF' }), /A clinic admin cannot assign another clinic\./);
   assert.throws(() => prepareDatabaseMutation(staffContext, 'staff_users', { clinicId: 'clinic-a', role: 'STAFF' }), /This role cannot modify staff users\./);
 });

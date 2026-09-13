@@ -219,7 +219,7 @@ test('db authorization prevents cross-clinic access and restricts doctors to sco
   assert.equal(canAccessRecord(doctorContext, { clinicId: 'clinic-1', doctorId: 'doctor-42', id: 'doctor-42' }, 'doctors'), true);
   assert.equal(canAccessRecord(doctorContext, { clinicId: 'clinic-1', doctorId: 'doctor-99', id: 'doctor-99' }, 'doctors'), false);
   assert.equal(canMutateGenericRecord(doctorContext, 'patients'), false);
-  assert.equal(canMutateGenericRecord(clinicAdminContext, 'patients'), true);
+  assert.equal(canMutateGenericRecord(clinicAdminContext, 'patients'), false);
   assert.throws(() => prepareDatabaseMutation(clinicAdminContext, 'staff_users', { clinicId: 'clinic-2', role: 'STAFF' }), /A clinic admin cannot assign another clinic\./);
   assert.deepEqual(prepareDatabaseMutation(clinicAdminContext, 'staff_users', { clinicId: 'clinic-1', role: 'STAFF' }), { clinicId: 'clinic-1', role: 'STAFF' });
 });
