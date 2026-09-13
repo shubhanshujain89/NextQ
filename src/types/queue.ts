@@ -52,6 +52,7 @@ export interface TokenItem {
   sessionId: string;
   tokenNumber: string; // e.g. "A-101", "W-102", "E-01"
   sequenceNumber: number;
+  scheduledSlot?: string;
   patientId?: string;
   patientName: string;
   patientPhone: string;

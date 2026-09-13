@@ -14,6 +14,7 @@ export interface Token {
   doctorId: string;
   tokenNumber: string;
   sequenceNumber: number;
+  scheduledSlot?: string;
   patientId?: string;
   patientName: string;
   patientPhone: string;
@@ -55,6 +56,7 @@ export class TokenRepository extends BaseRepository<Token> {
       doctorId: row.doctor_id,
       tokenNumber: row.token_number,
       sequenceNumber: row.sequence_number,
+      scheduledSlot: row.scheduled_slot || undefined,
       patientId: row.patient_id,
       patientName: row.patient_name,
       patientPhone: row.patient_phone,
@@ -177,11 +179,28 @@ export class TokenRepository extends BaseRepository<Token> {
    * Find tokens by doctor ID and session ID
    */
   async findByDoctorAndSession(doctorId: string, sessionId: string): Promise<Token[]> {
-    return this.findAll({ 
-      where: { doctor_id: doctorId, session_id: sessionId },
-      orderBy: 'sequence_number',
-      orderDirection: 'ASC'
-    });
+    const sql = `
+      SELECT t.*, a.scheduled_slot
+      FROM \`tokens\` t
+      LEFT JOIN \`appointments\` a
+        ON a.session_id = t.session_id
+       AND a.doctor_id = t.doctor_id
+       AND a.token_number = t.token_number
+      WHERE t.doctor_id = ? AND t.session_id = ?
+      ORDER BY t.sequence_number ASC
+    `;
+    return this.query(sql, [doctorId, sessionId]);
+  }
+
+  async cancelExpiredScheduledTokens(sessionId: string, now = new Date()): Promise<void> {
+    await executeQuery(
+      `UPDATE \`tokens\` t
+       JOIN \`appointments\` a ON a.session_id = t.session_id AND a.token_number = t.token_number
+       SET t.status = 'CANCELLED', a.status = 'cancelled', a.updated_at = ?
+       WHERE t.session_id = ? AND t.status IN ('WAITING', 'HOLD')
+         AND a.scheduled_time IS NOT NULL AND a.scheduled_time <= ?`,
+      [now, sessionId, now]
+    );
   }
 
   /**

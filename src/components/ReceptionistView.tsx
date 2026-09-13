@@ -47,6 +47,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedScheduledSlot, setSelectedScheduledSlot] = useState('ALL');
 
   // Vitals & Triage Note editing state
   const [vitalsToken, setVitalsToken] = useState<TokenItem | null>(null);
@@ -142,23 +143,25 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const activeToken = tokens.find(t => (
+  const timingOptions = Array.from(new Set(tokens.map((token) => token.scheduledSlot).filter(Boolean))) as string[];
+  const scopedTokens = selectedScheduledSlot === 'ALL' ? tokens : tokens.filter((token) => token.scheduledSlot === selectedScheduledSlot);
+  const activeToken = scopedTokens.find(t => (
     t.status === 'CALLED' || t.status === 'SERVING' || t.status === 'IN_CONSULTATION'
   ));
   const isServingStatus = (status: TokenItem['status']) => ['CALLED', 'SERVING', 'IN_CONSULTATION'].includes(status);
-  const waitingTokens = tokens.filter(t => t.status === 'WAITING').sort((a, b) => {
+  const waitingTokens = scopedTokens.filter(t => t.status === 'WAITING').sort((a, b) => {
     const pA = a.priority ?? 10;
     const pB = b.priority ?? 10;
     if (pA !== pB) return pA - pB;
     return a.sequenceNumber - b.sequenceNumber;
   });
-  const holdTokens = tokens.filter(t => t.status === 'HOLD');
-  const completedTokens = tokens.filter(t => t.status === 'COMPLETED');
+  const holdTokens = scopedTokens.filter(t => t.status === 'HOLD');
+  const completedTokens = scopedTokens.filter(t => t.status === 'COMPLETED');
   const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens);
   const averageWaitMinutes = averageWaitSummary.averageWaitMinutes;
 
   // Filter list
-  const filteredTokens = tokens.filter(token => {
+  const filteredTokens = scopedTokens.filter(token => {
     // Tab filter
     if (filterTab === 'WAITING' && token.status !== 'WAITING') return false;
     if (filterTab === 'SERVING' && !isServingStatus(token.status)) return false;
@@ -378,6 +381,16 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-10">
+      {timingOptions.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+          <span className="mr-1 text-xs font-bold uppercase tracking-wider text-slate-400">Timing</span>
+          {['ALL', ...timingOptions].map((slot) => (
+            <button key={slot} type="button" onClick={() => setSelectedScheduledSlot(slot)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${selectedScheduledSlot === slot ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+              {slot === 'ALL' ? 'All timings' : slot}
+            </button>
+          ))}
+        </div>
+      )}
       
       {/* Toast Alert */}
       {toastMessage && (

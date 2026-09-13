@@ -100,23 +100,43 @@ const extractEndTimeFromSlot = (slotValue: string): string | null => {
 };
 
 const getClinicAvailabilityStatus = (doctorList: Doctor[] = []) => {
-  const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-  const availableStarts = doctorList
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const availableSlots = doctorList
     .flatMap((doctor) => parseDoctorSlots(doctor.availableHours || ''))
     .filter((slot) => {
       const endTime = extractEndTimeFromSlot(slot.value);
       return !endTime || parseTimeToMinutes(endTime) > currentMinutes;
-    })
-    .map((slot) => slot.value)
-    .map(extractStartTimeFromSlot)
+    });
+
+  if (!availableSlots.length) {
+    return { tone: 'warning' as const, label: 'No slots remaining today' };
+  }
+
+  const nextSlot = availableSlots
+    .map((slot) => ({ slot, start: extractStartTimeFromSlot(slot.value) }))
+    .find((entry) => entry.start && parseTimeToMinutes(entry.start) > currentMinutes);
+  const hasActiveSlot = availableSlots.some((slot) => {
+    const startTime = extractStartTimeFromSlot(slot.value);
+    const endTime = extractEndTimeFromSlot(slot.value);
+    return Boolean(startTime && endTime)
+      && parseTimeToMinutes(startTime as string) <= currentMinutes
+      && parseTimeToMinutes(endTime as string) > currentMinutes;
+  });
+  const availableStarts = availableSlots
+    .map((slot) => extractStartTimeFromSlot(slot.value))
     .filter((time): time is string => Boolean(time));
 
-  if (!availableStarts.length) {
-    return { tone: 'warning' as const, label: 'No slots remaining today' };
+  if (!hasActiveSlot && nextSlot?.start) {
+    return { tone: 'warning' as const, label: `Not available until ${nextSlot.start}` };
   }
 
   if (doctorList.length >= 2) {
     return { tone: 'success' as const, label: 'Available today' };
+  }
+
+  if (hasActiveSlot) {
+    return { tone: 'success' as const, label: 'Available now' };
   }
 
   return { tone: 'success' as const, label: `Next available: ${availableStarts[0]}` };

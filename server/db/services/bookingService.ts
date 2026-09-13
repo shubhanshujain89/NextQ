@@ -140,6 +140,7 @@ export class BookingService {
     if (!input.appointmentSlot || !isBookingSlotAvailable(doctor.availableHours || '', input.appointmentSlot, today, clinic.timezone)) {
       throw new Error('This appointment slot is no longer available. Please choose another timing.');
     }
+    const appointmentSlot = input.appointmentSlot;
     const normalizedPhone = input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
     if (!/^\d{10}$/.test(normalizedPhone)) {
       throw new Error('Enter a valid 10-digit mobile number.');
@@ -156,6 +157,7 @@ export class BookingService {
          WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '+', ''), '-', ''), '(', ''), ')', ''), 10) = ?
            AND p.clinic_id = ?
            AND t.clinic_id = ?
+           AND t.status NOT IN ('CANCELLED', 'NO_SHOW')
            AND s.date = ?
          LIMIT 1`,
         [normalizedPhone, input.clinicId, input.clinicId, businessDate]
@@ -176,9 +178,10 @@ export class BookingService {
       // The clinic row lock serializes bookings before calculating MAX + 1.
       const [seqResult] = await connection.execute(
         `SELECT COALESCE(MAX(sequence_number), 0) as max_sequence
-         FROM \`tokens\`
-         WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?`,
-        [input.clinicId, session.id, input.doctorId]
+         FROM \`tokens\` t
+         LEFT JOIN \`appointments\` a ON a.session_id = t.session_id AND a.doctor_id = t.doctor_id AND a.token_number = t.token_number
+         WHERE t.clinic_id = ? AND t.session_id = ? AND t.doctor_id = ? AND a.scheduled_slot = ?`,
+        [input.clinicId, session.id, input.doctorId, appointmentSlot]
       );
       const sequenceNumber = (seqResult as any[])[0]?.max_sequence + 1 || 1;
       const tokenNumber = `A-${String(sequenceNumber).padStart(3, '0')}`;

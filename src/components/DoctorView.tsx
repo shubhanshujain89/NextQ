@@ -55,6 +55,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPatientListOpen, setIsPatientListOpen] = useState(false);
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
+  const [selectedScheduledSlot, setSelectedScheduledSlot] = useState('ALL');
 
   // Doctor editing patient details state
   const [editingToken, setEditingToken] = useState<TokenItem | null>(null);
@@ -224,20 +225,23 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
     }
   };
 
+  const timingOptions = Array.from(new Set(tokens.map((token) => token.scheduledSlot).filter(Boolean))) as string[];
+  const scopedTokens = selectedScheduledSlot === 'ALL' ? tokens : tokens.filter((token) => token.scheduledSlot === selectedScheduledSlot);
+
   // Filter queues
-  const activeToken = tokens.find(t => (
+  const activeToken = scopedTokens.find(t => (
     t.status === 'CALLED' || t.status === 'SERVING' || t.status === 'IN_CONSULTATION'
   ));
-  const waitingTokens = tokens.filter(t => t.status === 'WAITING');
-  const completedTokens = tokens.filter(t => t.status === 'COMPLETED');
-  const holdTokens = tokens.filter(t => t.status === 'HOLD');
+  const waitingTokens = scopedTokens.filter(t => t.status === 'WAITING');
+  const completedTokens = scopedTokens.filter(t => t.status === 'COMPLETED');
+  const holdTokens = scopedTokens.filter(t => t.status === 'HOLD');
 
   const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens);
   const averageWaitMinutes = averageWaitSummary.averageWaitMinutes;
 
-  const currentPatients = tokens.filter(t => t.status !== 'CANCELLED' && t.status !== 'NO_SHOW');
+  const currentPatients = scopedTokens.filter(t => t.status !== 'CANCELLED' && t.status !== 'NO_SHOW');
   const totalPatientsToday = currentPatients.length;
-  const tokenRevenue = tokens.reduce((total, token) => (
+  const tokenRevenue = scopedTokens.reduce((total, token) => (
     token.paymentStatus === 'PAID' && token.status !== 'CANCELLED' && token.status !== 'NO_SHOW'
       ? total + (Number(token.amountPaid || 0) > 0
         ? Number(token.amountPaid || 0) - (token.paymentMode === 'PAY_NOW' ? 25 : 0)
@@ -381,6 +385,16 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-3 pb-6 sm:px-4 lg:px-0">
+      {timingOptions.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+          <span className="mr-1 text-xs font-bold uppercase tracking-wider text-slate-400">Timing</span>
+          {['ALL', ...timingOptions].map((slot) => (
+            <button key={slot} type="button" onClick={() => setSelectedScheduledSlot(slot)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${selectedScheduledSlot === slot ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+              {slot === 'ALL' ? 'All timings' : slot}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Metrics Row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
 
@@ -679,12 +693,13 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
       </div>
 
       {isPatientListOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-6">
+          <div className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/95 px-4 py-4 sm:px-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-300">Today&apos;s queue</p>
-                <h2 className="mt-1 text-xl font-bold text-white">All patient details</h2>
+                <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">All patient details</h2>
+                <p className="mt-1 text-xs text-slate-400">{currentPatients.length} patient{currentPatients.length === 1 ? '' : 's'} in this timing view</p>
               </div>
               <button
                 type="button"
@@ -696,30 +711,32 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
               </button>
             </div>
 
-            <div className="space-y-2 p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
               {currentPatients.length > 0 ? currentPatients.map((token) => {
                 const canDelete = token.status === 'WAITING' || token.status === 'HOLD';
                 return (
-                  <div key={token.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                  <div key={token.id} className="mb-3 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 transition hover:border-slate-700 hover:bg-slate-950 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-white">{token.patientName}</span>
-                        <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-400">
+                        <span className="truncate text-base font-bold text-white">{token.patientName}</span>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${token.status === 'COMPLETED' ? 'bg-emerald-500/15 text-emerald-300' : token.status === 'HOLD' ? 'bg-amber-500/15 text-amber-300' : 'bg-blue-500/15 text-blue-300'}`}>
                           {token.status.replaceAll('_', ' ')}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-400">
-                        #{token.tokenNumber} · {token.patientPhone}
-                        {token.patientAge ? ` · ${token.patientAge} years` : ''}
-                        {token.patientGender ? ` · ${token.patientGender}` : ''}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <span className="font-mono font-bold text-teal-300">#{token.tokenNumber}</span>
+                        <span>{token.patientPhone}</span>
+                        {token.patientAge ? <span>{token.patientAge} years</span> : null}
+                        {token.patientGender ? <span>{token.patientGender}</span> : null}
+                      </div>
+                      {token.scheduledSlot && <span className="mt-2 inline-flex rounded-full border border-blue-400/20 bg-blue-400/10 px-2.5 py-1 text-[10px] font-semibold text-blue-200">{token.scheduledSlot}</span>}
                     </div>
                     {canDelete && (
                       <button
                         type="button"
                         onClick={() => handleDeleteConsultation(token)}
                         disabled={isDeletingPatient}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
+                        className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50 sm:self-center"
                         title="Delete consultation if patient did not arrive"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
