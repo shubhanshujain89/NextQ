@@ -43,6 +43,7 @@ export const createPublicBooking = async (input: {
   phone: string;
   age?: number;
   reason?: string;
+  appointmentDate?: string;
   appointmentSlot?: string;
   amountPaid?: number;
   paymentMode?: 'PAY_NOW' | 'PAY_AT_CLINIC';

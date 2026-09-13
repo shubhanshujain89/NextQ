@@ -7,6 +7,7 @@
 
 import { getPool, executeQuery, executeTransaction, closePool } from './connection.js';
 import { SCHEMA_SQL } from './schema.js';
+import { getClinicBusinessDate, getClinicDateTimeUtc } from './services/clinicTime.js';
 
 /**
  * Split SQL statements by semicolon, handling edge cases.
@@ -88,6 +89,75 @@ export async function runMigrations(): Promise<void> {
       if (!message.includes('Duplicate column') && !message.includes('already exists')) throw error;
     }
   };
+  const backfillAppointmentTimes = async () => {
+    const appointments = await executeQuery<{
+      id: string;
+      scheduled_slot?: string;
+      created_at: Date | string;
+      timezone?: string;
+    }>(
+      `SELECT a.id, a.scheduled_slot, a.created_at, c.timezone
+       FROM appointments a
+       JOIN clinics c ON c.id = a.clinic_id
+       WHERE a.scheduled_slot IS NOT NULL AND TRIM(a.scheduled_slot) <> ''`
+    );
+
+    for (const appointment of appointments) {
+      const createdAt = new Date(appointment.created_at);
+      const businessDate = getClinicBusinessDate(createdAt, appointment.timezone);
+      const scheduledTime = getClinicDateTimeUtc(businessDate, appointment.scheduled_slot, appointment.timezone);
+      if (!scheduledTime) continue;
+      await executeQuery(
+        `UPDATE appointments
+         SET scheduled_time = ?, estimated_time = ?
+         WHERE id = ? AND (scheduled_time IS NULL OR scheduled_time = created_at)`,
+        [scheduledTime, scheduledTime, appointment.id]
+      );
+    }
+  };
+  const migrateQrInventory = async () => {
+    const legacyRows = await executeQuery<{ id: string; value?: string }>(
+      'SELECT id, value FROM settings WHERE category = ?',
+      ['barcode_inventory']
+    );
+
+    for (const row of legacyRows) {
+      let payload: any;
+      try {
+        payload = typeof row.value === 'string' ? JSON.parse(row.value) : row.value || {};
+      } catch {
+        continue;
+      }
+
+      const code = String(payload?.barcodeValue || '').trim().toUpperCase();
+      const label = String(payload?.label || '').trim();
+      if (!code || !label) continue;
+
+      const status = String(payload?.status || '').trim().toUpperCase() === 'DISABLED'
+        ? 'DISABLED'
+        : payload?.assignedDoctorId ? 'ASSIGNED' : 'AVAILABLE';
+      await executeQuery(
+        `INSERT INTO qr_codes
+          (id, code, label, notes, status, clinic_id, doctor_id, assigned_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           label = VALUES(label), notes = VALUES(notes), status = VALUES(status),
+           clinic_id = VALUES(clinic_id), doctor_id = VALUES(doctor_id), assigned_at = VALUES(assigned_at)`,
+        [
+          row.id,
+          code,
+          label,
+          String(payload?.notes || '').trim() || null,
+          status,
+          payload?.assignedClinicId || null,
+          payload?.assignedDoctorId || null,
+          payload?.assignedAt || null,
+          payload?.createdAt || new Date(),
+          payload?.updatedAt || new Date(),
+        ]
+      );
+    }
+  };
   const ensureDoctorStatusDefault = async () => {
     await executeQuery(`ALTER TABLE clinics ALTER COLUMN doctor_status SET DEFAULT 'OUT'`);
   };
@@ -125,6 +195,8 @@ export async function runMigrations(): Promise<void> {
   await ensureSubscriptionColumns();
   await ensureClinicTimezone();
   await ensureAppointmentSlot();
+  await backfillAppointmentTimes();
+  await migrateQrInventory();
   await ensureDoctorStatusDefault();
 
   await executeQuery(`ALTER TABLE tokens MODIFY token_type ENUM('ONLINE', 'WALK_IN', 'VIP', 'EMERGENCY') DEFAULT 'ONLINE'`);
@@ -193,6 +265,7 @@ export async function dropAllTables(): Promise<void> {
   
   const tables = [
     'rate_limits',
+    'qr_codes',
     'whatsapp_logs',
     'settings',
     'doctor_status',

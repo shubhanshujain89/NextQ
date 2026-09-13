@@ -47,6 +47,13 @@ const toShortWeekday = (date: Date) => new Intl.DateTimeFormat('en-US', { weekda
 
 const formatScheduleDate = (date: Date) => new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 
+const formatBookingDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const parseTimeToMinutes = (timeText: string) => {
   const match = String(timeText || '').match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
   if (!match) return 0;
@@ -348,7 +355,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
           patientName: bookingData.patientName,
           phone: bookingData.phone,
           age: bookingData.age ? Number(bookingData.age) : undefined,
-          appointmentDate: selectedAppointmentDate ? selectedAppointmentDate.toISOString() : undefined,
+          appointmentDate: selectedAppointmentDate ? formatBookingDate(selectedAppointmentDate) : undefined,
           appointmentSlot: selectedAppointmentSlot || undefined,
         }),
       });

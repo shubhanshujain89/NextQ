@@ -9,7 +9,7 @@ import type mysql from 'mysql2/promise';
 import type { Session } from '../repositories/sessions.js';
 import crypto from 'crypto';
 import { assertActiveClinicPlan } from './planService.js';
-import { getClinicBusinessDate } from './clinicTime.js';
+import { getClinicBusinessDate, getClinicDateTimeUtc } from './clinicTime.js';
 
 export interface BookingInput {
   clinicId: string;
@@ -19,6 +19,7 @@ export interface BookingInput {
   age?: number;
   reason?: string;
   appointmentSlot?: string;
+  appointmentDate?: string;
   amountPaid?: number;
   paymentMode?: 'PAY_NOW' | 'PAY_AT_CLINIC';
   paymentMethod?: string;
@@ -146,6 +147,7 @@ export class BookingService {
       const patientId = crypto.randomUUID();
       const tokenId = crypto.randomUUID();
       const now = new Date();
+      const scheduledTime = getClinicDateTimeUtc(input.appointmentDate, input.appointmentSlot, clinic.timezone) || now;
 
       // Serialize bookings for this clinic before calculating MAX + 1.
       await connection.execute('SELECT id FROM `clinics` WHERE id = ? FOR UPDATE', [input.clinicId]);
@@ -186,7 +188,7 @@ export class BookingService {
         [
           crypto.randomUUID(), input.clinicId, input.doctorId, session.id, trackingId,
           input.patientName.trim(), input.phone.trim(), input.age || null, input.reason?.trim() || null,
-          'ONLINE', tokenNumber, sequenceNumber, input.appointmentSlot || null, 'scheduled', now, now, now, now
+          'ONLINE', tokenNumber, sequenceNumber, input.appointmentSlot || null, 'scheduled', scheduledTime, scheduledTime, now, now
         ]
       );
 

@@ -12,7 +12,6 @@ import { getClinicBusinessDate } from './server/db/services/clinicTime.js';
 import { validateSessionSecret, validateSuperAdminBootstrapPassword } from './server/bootstrap.js';
 import { canAccessRecord, canMutateGenericRecord, prepareDatabaseMutation, requireDatabaseAccess, sanitizeDatabaseRecord } from './server/auth/authorization.js';
 import { classifyRateLimitCount, type RateLimitStatus } from './server/rateLimit.js';
-import { normalizeQrStatus } from './src/lib/qrInventory.js';
 
 dotenv.config();
 
@@ -28,24 +27,23 @@ if (sessionSecretError) {
   throw new Error(sessionSecretError);
 }
 
-const databaseReady = getDatabase().then(async () => {
-  try {
-    await executeQuery('ALTER TABLE appointments ADD COLUMN scheduled_slot VARCHAR(100) NULL AFTER token_sequence');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes('Duplicate column') && !message.includes('already exists')) {
-      console.warn('Appointment timing migration could not be applied at startup:', message);
-    }
-  }
-  try {
-    await executeQuery(`ALTER TABLE clinics ALTER COLUMN doctor_status SET DEFAULT 'OUT'`);
-  } catch (error) {
-    console.warn('Doctor status default migration could not be applied at startup:', error instanceof Error ? error.message : error);
-  }
+const databaseReady = getDatabase().then(() => {
+  return true;
 }).catch((error) => {
   console.warn('Database unavailable at startup; continuing in degraded mode.', error instanceof Error ? error.message : error);
-  return undefined;
+  return false;
 });
+
+const isDatabaseReady = async (): Promise<boolean> => {
+  if (!await databaseReady) return false;
+  try {
+    await executeQueryOne('SELECT 1 AS ready');
+    return true;
+  } catch (error) {
+    console.warn('Database readiness check failed:', error instanceof Error ? error.message : error);
+    return false;
+  }
+};
 
 const rateLimitTableReady = databaseReady.then(async () => {
   try {
@@ -302,6 +300,16 @@ app.get('/api/health', (_req, res) => {
   res.status(200).json({
     status: 'ok',
     app: 'NEXTQ',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/ready', async (_req, res) => {
+  const ready = await isDatabaseReady();
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    app: 'NEXTQ',
+    database: ready ? 'ok' : 'unavailable',
     timestamp: new Date().toISOString(),
   });
 });
@@ -613,20 +621,6 @@ const makeDoctorBookingQrCodeUrl = async (req: express.Request, clinicId: string
   return QRCode.toDataURL(bookingUrl, { width: 220, margin: 1, errorCorrectionLevel: 'M' });
 };
 
-const parseBarcodeInventoryRecord = (record: any) => {
-  try {
-    const payload = typeof record?.value === 'string' ? JSON.parse(record.value) : record?.value || {};
-    return {
-      ...payload,
-      id: record.id,
-      barcodeValue: String(payload.barcodeValue || '').toUpperCase(),
-      status: normalizeQrStatus(payload.assignedDoctorId ? 'ASSIGNED' : payload.status),
-    };
-  } catch {
-    return null;
-  }
-};
-
 const queueMutationContext = async (req: express.Request, res: express.Response) => {
   const context = await authContext(req);
   if (!context || !context.clinicId || !['SUPER_ADMIN', 'CLINIC_ADMIN', 'DOCTOR', 'STAFF'].includes(context.role)) {
@@ -781,11 +775,12 @@ app.post('/api/patient/book', async (req, res) => {
     if (!(await enforceRateLimit(res, `booking:${clientIp}`, 10))) {
       return;
     }
-    const { clinicId, doctorId, patientName, phone, age, reason, appointmentSlot, amountPaid, paymentMode, paymentMethod, paymentStatus } = req.body || {};
+    const { clinicId, doctorId, patientName, phone, age, reason, appointmentDate, appointmentSlot, amountPaid, paymentMode, paymentMethod, paymentStatus } = req.body || {};
     const normalizedPatientName = String(patientName || '').trim();
     const normalizedPhone = String(phone || '').trim();
     const normalizedReason = String(reason || '').trim();
     const normalizedAppointmentSlot = String(appointmentSlot || '').trim();
+    const normalizedAppointmentDate = String(appointmentDate || '').trim();
     const normalizedPaymentStatus = paymentStatus === 'PAID' ? 'PAID' : 'PENDING';
     const normalizedPaymentMode = paymentMode === 'PAY_NOW' ? 'PAY_NOW' : 'PAY_AT_CLINIC';
     const normalizedAmountPaid = normalizedPaymentStatus === 'PAID' ? Math.max(0, Number(amountPaid) || 0) : 0;
@@ -797,7 +792,7 @@ app.post('/api/patient/book', async (req, res) => {
     if (!(await enforceRateLimit(res, `booking-phone:${normalizedPhone}`, 3))) {
       return;
     }
-    if (normalizedPatientName.length > 120 || normalizedPhone.length > 30 || normalizedReason.length > 500 || normalizedAppointmentSlot.length > 100) {
+    if (normalizedPatientName.length > 120 || normalizedPhone.length > 30 || normalizedReason.length > 500 || normalizedAppointmentDate.length > 40 || normalizedAppointmentSlot.length > 100) {
       res.status(400).json({ error: 'Booking details exceed the allowed length.' });
       return;
     }
@@ -812,6 +807,7 @@ app.post('/api/patient/book', async (req, res) => {
       phone: normalizedPhone,
       age: normalizedAge,
       reason: normalizedReason || undefined,
+      appointmentDate: normalizedAppointmentDate || undefined,
       appointmentSlot: normalizedAppointmentSlot || undefined,
       amountPaid: normalizedAmountPaid,
       paymentMode: normalizedPaymentMode,
@@ -1144,11 +1140,23 @@ app.get('/api/barcodes', async (req, res) => {
   }
 
   try {
-    const records = await repositories.settings.findAll({ where: { category: 'barcode_inventory' }, orderBy: 'updated_at', orderDirection: 'DESC' });
-    const inventory = records.flatMap((record) => {
-      const parsed = parseBarcodeInventoryRecord(record);
-      return parsed ? [{ ...parsed, status: normalizeQrStatus(parsed.status, parsed.assignedDoctorId) }] : [];
-    });
+    const records = await repositories.qrCodes.findAll({ orderBy: 'updated_at', orderDirection: 'DESC' });
+    const inventory = await Promise.all(records.map(async (record) => {
+      const doctor = record.doctorId ? await repositories.doctors.findById(record.doctorId) : null;
+      return {
+        id: record.id,
+        barcodeValue: record.code,
+        label: record.label,
+        notes: record.notes || '',
+        status: record.status,
+        assignedDoctorId: record.doctorId || null,
+        assignedDoctorName: doctor?.name || null,
+        assignedClinicId: record.clinicId || null,
+        assignedAt: record.assignedAt?.toISOString() || null,
+        createdAt: record.createdAt.toISOString(),
+        updatedAt: record.updatedAt.toISOString(),
+      };
+    }));
     res.status(200).json(inventory);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to load barcode inventory.' });
@@ -1170,37 +1178,35 @@ app.post('/api/barcodes', async (req, res) => {
       return;
     }
 
-    const records = await repositories.settings.findAll({ where: { category: 'barcode_inventory' } });
-    const duplicate = records.some((record) => {
-      const parsed = parseBarcodeInventoryRecord(record);
-      return parsed && parsed.barcodeValue === barcodeValue;
-    });
+    const duplicate = await repositories.qrCodes.findByCode(barcodeValue);
     if (duplicate) {
       res.status(409).json({ error: 'That barcode value already exists.' });
       return;
     }
 
-    const now = new Date().toISOString();
-    const inventoryItem = {
-      barcodeValue,
+    const record = await repositories.qrCodes.create({
+      id: crypto.randomUUID(),
+      code: barcodeValue,
       label,
       notes: String(req.body?.notes || '').trim(),
-      status: normalizeQrStatus(req.body?.status),
+      status: 'AVAILABLE',
+      clinicId: null,
+      doctorId: null,
+      assignedAt: null,
+    } as any);
+    res.status(201).json({
+      id: record.id,
+      barcodeValue: record.code,
+      label: record.label,
+      notes: record.notes || '',
+      status: record.status,
       assignedDoctorId: null,
       assignedDoctorName: null,
       assignedClinicId: null,
       assignedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const record = await repositories.settings.create({
-      id: crypto.randomUUID(),
-      key: `barcode_${barcodeValue}_${crypto.randomUUID()}`,
-      value: JSON.stringify(inventoryItem),
-      category: 'barcode_inventory',
-      clinicId: null,
-    } as any);
-    res.status(201).json({ id: record.id, ...inventoryItem });
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to create barcode.' });
   }
@@ -1214,79 +1220,67 @@ app.patch('/api/barcodes/:barcodeId', async (req, res) => {
   }
 
   try {
-    const record = await repositories.settings.findById(String(req.params.barcodeId || ''));
-    if (!record || record.category !== 'barcode_inventory') {
+    const record = await repositories.qrCodes.findById(String(req.params.barcodeId || ''));
+    if (!record) {
       res.status(404).json({ error: 'Barcode not found.' });
       return;
     }
 
-    const current = parseBarcodeInventoryRecord(record) || JSON.parse(record.value || '{}');
-    const requestedStatus = normalizeQrStatus(req.body?.status || current.status);
+    const requestedStatus = String(req.body?.status || record.status).trim().toUpperCase();
     const doctorId = req.body?.assignedDoctorId ? String(req.body.assignedDoctorId) : '';
-
-    let assignment = {
-      assignedDoctorId: null as string | null,
-      assignedDoctorName: null as string | null,
-      assignedClinicId: null as string | null,
-      assignedAt: null as string | null,
-      status: requestedStatus,
-    };
+    if (!['AVAILABLE', 'ASSIGNED', 'DISABLED'].includes(requestedStatus)) {
+      res.status(400).json({ error: 'Invalid barcode status.' });
+      return;
+    }
 
     if (requestedStatus === 'DISABLED') {
-      assignment = {
-        assignedDoctorId: null,
-        assignedDoctorName: null,
-        assignedClinicId: null,
-        assignedAt: null,
-        status: 'DISABLED',
-      };
+      await repositories.qrCodes.update(record.id, { status: 'DISABLED', clinicId: null, doctorId: null, assignedAt: null });
     } else if (doctorId) {
       const doctor = await repositories.doctors.findById(doctorId);
       if (!doctor || doctor.status !== 'active') {
         res.status(404).json({ error: 'Doctor not found.' });
         return;
       }
-      const existingAssignment = (await repositories.settings.findAll({ where: { category: 'barcode_inventory' } })).some((candidate) => {
-        if (candidate.id === record.id) return false;
-        const parsed = parseBarcodeInventoryRecord(candidate);
-        return Boolean(parsed && parsed.assignedDoctorId && parsed.assignedDoctorId === doctor.id);
-      });
+      const existingAssignment = await repositories.qrCodes.findAssignedToDoctor(doctor.id);
+      if (existingAssignment && existingAssignment.id === record.id) {
+        res.status(409).json({ error: 'This doctor already has this barcode assigned.' });
+        return;
+      }
       if (existingAssignment) {
         res.status(409).json({ error: 'This doctor already has a barcode assigned.' });
         return;
       }
-      assignment = {
-        assignedDoctorId: doctor.id,
-        assignedDoctorName: doctor.name,
-        assignedClinicId: doctor.clinicId,
-        assignedAt: new Date().toISOString(),
+      await repositories.qrCodes.update(record.id, {
+        doctorId: doctor.id,
+        clinicId: doctor.clinicId,
+        assignedAt: new Date(),
         status: 'ASSIGNED',
-      };
+      });
     } else if (requestedStatus === 'ASSIGNED') {
-      if (!current.assignedDoctorId) {
+      if (!record.doctorId) {
         res.status(409).json({ error: 'An assigned doctor is required for an assigned QR code.' });
         return;
       }
-      assignment = {
-        assignedDoctorId: current.assignedDoctorId || null,
-        assignedDoctorName: current.assignedDoctorName || null,
-        assignedClinicId: current.assignedClinicId || null,
-        assignedAt: current.assignedAt || null,
-        status: 'ASSIGNED',
-      };
+      await repositories.qrCodes.update(record.id, { status: 'ASSIGNED' });
     } else {
-      assignment = {
-        assignedDoctorId: null,
-        assignedDoctorName: null,
-        assignedClinicId: null,
-        assignedAt: null,
-        status: 'AVAILABLE',
-      };
+      await repositories.qrCodes.update(record.id, { status: 'AVAILABLE', clinicId: null, doctorId: null, assignedAt: null });
     }
 
-    const updated = { ...current, ...assignment, updatedAt: new Date().toISOString() };
-    await repositories.settings.update(record.id, { value: JSON.stringify(updated) });
-    res.status(200).json({ id: record.id, ...updated });
+    const updated = await repositories.qrCodes.findById(record.id);
+    const updatedDoctor = updated?.doctorId ? await repositories.doctors.findById(updated.doctorId) : null;
+    res.status(200).json({
+      id: record.id,
+      barcodeValue: updated?.code,
+      label: updated?.label,
+      notes: updated?.notes || '',
+      status: updated?.status,
+      assignedDoctorId: updated?.doctorId || null,
+      assignedDoctorName: updatedDoctor?.name || null,
+      assignedClinicId: updated?.clinicId || null,
+      assignedAt: updated?.assignedAt?.toISOString() || null,
+      createdAt: updated?.createdAt.toISOString(),
+      updatedAt: updated?.updatedAt.toISOString(),
+    });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to update barcode assignment.' });
   }
@@ -1300,10 +1294,7 @@ app.get('/q/:code', async (req, res) => {
       return;
     }
 
-    const records = await repositories.settings.findAll({ where: { category: 'barcode_inventory' } });
-    const match = records
-      .map(parseBarcodeInventoryRecord)
-      .find((item) => item && item.barcodeValue === qrCode);
+    const match = await repositories.qrCodes.findByCode(qrCode);
 
     if (!match) {
       res.status(404).json({ error: 'QR code not found in NEXTQ inventory.' });
@@ -1315,8 +1306,8 @@ app.get('/q/:code', async (req, res) => {
       return;
     }
 
-    if (match.assignedClinicId && match.assignedDoctorId) {
-      res.redirect(302, `/booking?clinicId=${encodeURIComponent(match.assignedClinicId)}&doctorId=${encodeURIComponent(match.assignedDoctorId)}`);
+    if (match.clinicId && match.doctorId) {
+      res.redirect(302, `/booking?clinicId=${encodeURIComponent(match.clinicId)}&doctorId=${encodeURIComponent(match.doctorId)}`);
       return;
     }
 
@@ -1334,10 +1325,7 @@ app.get('/api/q/:code', async (req, res) => {
       return;
     }
 
-    const records = await repositories.settings.findAll({ where: { category: 'barcode_inventory' } });
-    const match = records
-      .map(parseBarcodeInventoryRecord)
-      .find((item) => item && item.barcodeValue === qrCode);
+    const match = await repositories.qrCodes.findByCode(qrCode);
 
     if (!match) {
       res.status(404).json({ error: 'QR code not found in NEXTQ inventory.' });
@@ -1345,11 +1333,11 @@ app.get('/api/q/:code', async (req, res) => {
     }
 
     res.status(200).json({
-      qrCode: match.barcodeValue,
+      qrCode: match.code,
       status: match.status,
-      clinicId: match.assignedClinicId || null,
-      doctorId: match.assignedDoctorId || null,
-      doctorName: match.assignedDoctorName || null,
+      clinicId: match.clinicId || null,
+      doctorId: match.doctorId || null,
+      doctorName: null,
     });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to resolve QR code.' });
@@ -1363,12 +1351,12 @@ app.delete('/api/barcodes/:barcodeId', async (req, res) => {
     return;
   }
   try {
-    const record = await repositories.settings.findById(String(req.params.barcodeId || ''));
-    if (!record || record.category !== 'barcode_inventory') {
+    const record = await repositories.qrCodes.findById(String(req.params.barcodeId || ''));
+    if (!record) {
       res.status(404).json({ error: 'Barcode not found.' });
       return;
     }
-    await repositories.settings.delete(record.id);
+    await repositories.qrCodes.delete(record.id);
     res.status(204).end();
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to delete barcode.' });
@@ -1428,7 +1416,7 @@ app.get('/api/auth/me', async (req, res) => {
 
 app.get('/api/db/health', async (_req, res) => {
   try {
-    await getDatabase();
+    if (!await isDatabaseReady()) throw new Error('Database unavailable');
     res.status(200).json({
       status: 'ok',
       database: 'mysql',

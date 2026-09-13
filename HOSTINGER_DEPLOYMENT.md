@@ -84,8 +84,11 @@ After deployment, verify:
 
 ### Health Checks
 ```bash
-# Check if app is running
+# Check if the process is running
 curl https://your-domain/api/health
+
+# Check if the application and database are ready
+curl https://your-domain/api/ready
 
 # Check server status
 curl https://your-domain/api/status

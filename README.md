@@ -100,8 +100,11 @@ git push origin main
 After deployment, test:
 
 ```bash
-# Health check
+# Liveness check: process is running
 curl https://your-domain.com/api/health
+
+# Readiness check: database is reachable and usable
+curl https://your-domain.com/api/ready
 
 # Status endpoint
 curl https://your-domain.com/api/status
@@ -139,6 +142,7 @@ nextq/
 
 ### Public Endpoints
 - `GET /api/health` - Health check
+- `GET /api/ready` - Readiness check including live MySQL connectivity
 - `GET /api/status` - Server status
 
 ### Authentication

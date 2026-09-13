@@ -21,6 +21,7 @@ export interface TrackingResult {
   doctorStatus: string;
   delayMinutes: number;
   appointmentSlot?: string;
+  appointmentDate?: string;
   currentlyServingToken?: string;
 }
 
@@ -51,6 +52,7 @@ export class TrackingService {
         c.operating_hours,
         d.available_hours AS doctor_available_hours,
         a.scheduled_slot AS appointment_slot,
+        a.scheduled_time AS scheduled_time,
         t.session_id,
         t.clinic_id,
         t.doctor_id,
@@ -128,16 +130,29 @@ export class TrackingService {
     const estimatedWaitMinutes = getPublicTrackingEstimatedWaitMinutes({
       doctorStatus: result.doctor_status,
       status: result.status,
-      operatingHours: result.appointment_slot || result.doctor_available_hours || result.operating_hours,
+      operatingHours: result.operating_hours,
       queueWaitMinutes: rawEstimatedWaitMinutes,
       now: new Date(),
       timezone: result.timezone,
     });
+    const queueEstimatedTime = new Date(Date.now() + estimatedWaitMinutes * 60 * 1000);
+    const scheduledTime = result.scheduled_time ? new Date(result.scheduled_time) : null;
+    const estimatedTime = scheduledTime && Number.isFinite(scheduledTime.getTime())
+      ? new Date(Math.max(queueEstimatedTime.getTime(), scheduledTime.getTime()))
+      : queueEstimatedTime;
     const estimatedConsultationTime = new Intl.DateTimeFormat('en-IN', {
       timeZone: result.timezone || 'Asia/Kolkata',
       hour: 'numeric',
       minute: '2-digit',
-    }).format(new Date(Date.now() + estimatedWaitMinutes * 60 * 1000));
+    }).format(estimatedTime);
+    const appointmentDate = scheduledTime && Number.isFinite(scheduledTime.getTime())
+      ? new Intl.DateTimeFormat('en-IN', {
+          timeZone: result.timezone || 'Asia/Kolkata',
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        }).format(scheduledTime)
+      : undefined;
 
     // Map status for public display
     const publicStatus = result.status === 'SERVING' ? 'IN_CONSULTATION' : result.status;
@@ -157,6 +172,7 @@ export class TrackingService {
       doctorStatus: result.doctor_status,
       delayMinutes: Number(result.delay_minutes) || 0,
       appointmentSlot: result.appointment_slot || undefined,
+      appointmentDate,
       currentlyServingToken: servingResult?.token_number || undefined,
     };
   }

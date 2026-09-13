@@ -31,3 +31,49 @@ export const getClinicDayStartUtc = (businessDate: string, timezone = DEFAULT_CL
   const offsetMs = localAsUtc - probe.getTime();
   return new Date(Date.UTC(year, month - 1, day) - offsetMs);
 };
+
+export const getClinicDateTimeUtc = (dateValue: string | undefined, slotValue: string | undefined, timezone = DEFAULT_CLINIC_TIMEZONE): Date | null => {
+  const dateMatch = String(dateValue || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const slotMatch = String(slotValue || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!dateMatch || !slotMatch) return null;
+
+  let hour = Number(slotMatch[1]);
+  const minute = Number(slotMatch[2]);
+  const meridiem = String(slotMatch[3] || '').toUpperCase();
+  if (meridiem === 'PM' && hour < 12) hour += 12;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendarDate.getUTCFullYear() !== year
+    || calendarDate.getUTCMonth() !== month - 1
+    || calendarDate.getUTCDate() !== day
+  ) return null;
+  const naiveUtc = Date.UTC(year, month - 1, day, hour, minute);
+  const probe = new Date(naiveUtc);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: getClinicTimezone(timezone),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(probe);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const localAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+  const offsetMs = localAsUtc - naiveUtc;
+  return new Date(naiveUtc - offsetMs);
+};

@@ -14,6 +14,7 @@ export * from './tokens.js';
 export * from './queueEvents.js';
 export * from './doctorStatus.js';
 export * from './settings.js';
+export * from './qrCodes.js';
 export * from './whatsAppLogs.js';
 
 // Repository instances
@@ -27,6 +28,7 @@ import { tokenRepository } from './tokens.js';
 import { queueEventRepository } from './queueEvents.js';
 import { doctorStatusRepository } from './doctorStatus.js';
 import { settingsRepository } from './settings.js';
+import { qrCodeRepository } from './qrCodes.js';
 import { whatsAppLogRepository } from './whatsAppLogs.js';
 
 export const repositories = {
@@ -40,5 +42,6 @@ export const repositories = {
   queueEvents: queueEventRepository,
   doctorStatus: doctorStatusRepository,
   settings: settingsRepository,
+  qrCodes: qrCodeRepository,
   whatsAppLogs: whatsAppLogRepository,
 };

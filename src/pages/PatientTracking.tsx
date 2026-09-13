@@ -19,6 +19,7 @@ interface TrackingData {
   delayMinutes: number;
   estimatedConsultationMinutes: number;
   appointmentSlot?: string;
+  appointmentDate?: string;
   currentlyServingToken?: string;
 }
 
@@ -168,7 +169,7 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Live tracking</p>
                   <p className="mt-2 text-sm font-semibold text-slate-800">{tracking.doctor}</p>
                   <p className="mt-1 text-sm text-slate-500">{tracking.clinic}</p>
-                  {tracking.appointmentSlot && <p className="mt-1 text-sm font-medium text-emerald-700">Booked timing: {tracking.appointmentSlot}</p>}
+                  {tracking.appointmentSlot && <p className="mt-1 text-sm font-medium text-emerald-700">Booked timing: {tracking.appointmentDate ? `${tracking.appointmentDate} · ` : ''}{tracking.appointmentSlot}</p>}
                 </div>
                 <div className="min-w-[150px] text-right">
                   <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${tracking.doctorStatus === 'IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>

@@ -674,18 +674,38 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       return;
     }
     const logoUrl = new URL('/nextq-logo.png', window.location.origin).href;
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+    const safeCode = escapeHtml(code);
+    const safeQrUrl = escapeHtml(qrUrl);
 
-    popup.document.write(`<!doctype html><html><head><title>${code} - NEXTQ</title><style>
-      @page { margin: 12mm; }
-      body { margin: 0; display: flex; min-height: 100vh; align-items: center; justify-content: center; font-family: Arial, sans-serif; }
-      .card { width: 72mm; padding: 6mm; text-align: center; border: 1px solid #d1d5db; }
-      .qr { display: block; width: 62mm; height: 62mm; margin: 0 auto 4mm; }
-      .logo { display: block; width: 42mm; height: 10mm; object-fit: contain; margin: 0 auto 3mm; }
-      .code { font: 700 12pt monospace; letter-spacing: 2px; }
-    </style></head><body><main class="card">
-      <img class="qr" src="${qrImageUrl}" alt="QR code for ${qrUrl}">
-      <img class="logo" src="${logoUrl}" alt="NEXTQ">
-      <div class="code">${code}</div>
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${safeCode} - NEXTQ</title><style>
+      @page { size: A5 portrait; margin: 0; }
+      * { box-sizing: border-box; }
+      html, body { width: 148mm; height: 210mm; margin: 0; }
+      body { display: flex; align-items: center; justify-content: center; background: #ffffff; color: #102a2d; font-family: Georgia, 'Times New Roman', serif; }
+      .standee { width: 148mm; height: 210mm; padding: 15mm 14mm 13mm; display: flex; flex-direction: column; align-items: center; text-align: center; }
+      .brand { display: block; width: 51mm; height: 14mm; object-fit: contain; margin: 0 auto 11mm; }
+      .eyebrow { margin: 0 0 4mm; color: #16847b; font: 700 8pt Arial, sans-serif; letter-spacing: 2.5px; text-transform: uppercase; }
+      h1 { max-width: 110mm; margin: 0; color: #102a2d; font-size: 27pt; line-height: 1.02; letter-spacing: -0.4px; }
+      .intro { max-width: 105mm; margin: 5mm 0 9mm; color: #587074; font: 400 11pt/1.45 Arial, sans-serif; }
+      .qr-frame { width: 116mm; height: 116mm; padding: 4mm; display: flex; align-items: center; justify-content: center; border: 0.6mm solid #b8e5df; border-radius: 4mm; background: #ffffff; }
+      .qr { display: block; width: 106mm; height: 106mm; }
+      .footer { margin-top: auto; }
+      .action { margin: 0 0 3mm; color: #16847b; font: 700 9pt Arial, sans-serif; letter-spacing: 1.8px; text-transform: uppercase; }
+      .code { margin: 0; color: #587074; font: 700 8pt/1.2 Arial, sans-serif; letter-spacing: 2px; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    </style></head><body><main class="standee">
+      <img class="brand" src="${escapeHtml(logoUrl)}" alt="NEXTQ">
+      <p class="eyebrow">Smart queue. Less waiting.</p>
+      <h1>Scan to book<br>your appointment</h1>
+      <p class="intro">Use your phone camera to choose a clinic, select a doctor, and join the queue.</p>
+      <div class="qr-frame"><img class="qr" src="${escapeHtml(qrImageUrl)}" alt="QR code for ${safeQrUrl}"></div>
+      <footer class="footer"><p class="action">Point. Scan. Book.</p><p class="code">${safeCode}</p></footer>
     </main><script>window.addEventListener('load', () => { window.print(); });</script></body></html>`);
     popup.document.close();
   };

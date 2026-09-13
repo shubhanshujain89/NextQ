@@ -278,6 +278,24 @@ CREATE TABLE IF NOT EXISTS settings (
     UNIQUE KEY uk_settings_clinic_key (clinic_id, \`key\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- QR inventory table
+CREATE TABLE IF NOT EXISTS qr_codes (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    label VARCHAR(255) NOT NULL,
+    notes TEXT,
+    status ENUM('AVAILABLE', 'ASSIGNED', 'DISABLED') NOT NULL DEFAULT 'AVAILABLE',
+    clinic_id VARCHAR(64),
+    doctor_id VARCHAR(64),
+    assigned_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_qr_codes_status (status),
+    INDEX idx_qr_codes_clinic_id (clinic_id),
+    INDEX idx_qr_codes_doctor_id (doctor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- WhatsApp Logs table
 CREATE TABLE IF NOT EXISTS whatsapp_logs (
     id VARCHAR(64) PRIMARY KEY,
