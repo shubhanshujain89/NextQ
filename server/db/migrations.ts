@@ -8,6 +8,7 @@
 import { getPool, executeQuery, executeTransaction, closePool } from './connection.js';
 import { SCHEMA_SQL } from './schema.js';
 import { getClinicBusinessDate, getClinicDateTimeUtc } from './services/clinicTime.js';
+import { pathToFileURL } from 'node:url';
 
 /**
  * Split SQL statements by semicolon, handling edge cases.
@@ -347,8 +348,9 @@ export async function resetDatabase(): Promise<void> {
 
 // CLI entry point
 const command = process.argv[2];
+const isMainModule = Boolean(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href);
 
-switch (command) {
+if (isMainModule) switch (command) {
   case 'migrate':
     runMigrations()
       .finally(() => closePool())

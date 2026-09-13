@@ -11,6 +11,7 @@ import { getClinicPlanSnapshot, getPlanLimits } from './server/db/services/planS
 import { getClinicBusinessDate } from './server/db/services/clinicTime.js';
 import { isValidTrackingId } from './server/db/services/trackingService.js';
 import { validateSessionSecret, validateSuperAdminBootstrapPassword } from './server/bootstrap.js';
+import { runMigrations } from './server/db/migrations.js';
 import { canAccessRecord, canMutateGenericRecord, prepareDatabaseMutation, requireDatabaseAccess, sanitizeDatabaseRecord } from './server/auth/authorization.js';
 import { serializeStaffQueueToken } from './server/auth/responsePolicy.js';
 import { classifyRateLimitCount, type RateLimitStatus } from './server/rateLimit.js';
@@ -50,6 +51,7 @@ const ensureQrCodeTable = async () => {
 };
 
 const databaseReady = getDatabase().then(async () => {
+  await runMigrations();
   await ensureQrCodeTable();
   return true;
 }).catch((error) => {
