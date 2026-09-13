@@ -472,10 +472,9 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
         return;
       }
 
-      const fallbackTokenNumber = `NEXTQ-${String(Date.now()).slice(-6)}`;
-      setGeneratedTokenNumber(fallbackTokenNumber);
-      setStep('confirm');
-      alert(`${errorMessage}. Booking saved in demo mode.`);
+      setGeneratedTokenNumber('');
+      setStep('booking');
+      alert(errorMessage);
     }
   };
 
