@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as QRCode from 'qrcode';
 import {
-  Tv,
   Maximize2,
   Minimize2,
   Volume2,
@@ -65,7 +64,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
     }
   }, [activeToken?.tokenNumber, soundEnabled, clinic.cabinNumber]);
 
-  // Fullscreen trigger
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -77,7 +75,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
   };
 
   const isDoctorIn = clinic.doctorStatus === 'IN';
-  const bookingHref = `/booking?clinicId=${encodeURIComponent(clinic.id)}&doctorId=${encodeURIComponent(clinic.doctorId || '')}`;
   const bookingUrl = makeDoctorBookingUrl(clinic.id, clinic.doctorId || '');
   const [generatedBookingQr, setGeneratedBookingQr] = useState('');
 
@@ -119,7 +116,7 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
           </div>
         </div>
 
-        {/* Right Side: Doctor Status & Clock & Controls */}
+        {/* Right Side: Doctor Status, Clock & Controls */}
         <div className="flex items-center space-x-4 sm:space-x-6">
           
           {/* Doctor Status Banner */}
@@ -140,7 +137,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
             <span className="text-2xl font-black text-white">{currentTime}</span>
           </div>
 
-          {/* Audio Toggle */}
           <button
             onClick={() => {
               setSoundEnabled(!soundEnabled);
@@ -154,7 +150,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
             {soundEnabled ? <Volume2 className="w-6 h-6 text-teal-400" /> : <VolumeX className="w-6 h-6 text-slate-500" />}
           </button>
 
-          {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
             title="Toggle Fullscreen"
@@ -245,11 +240,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
 
         {/* Phone Tracking Side Card */}
         <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-slate-700/80 bg-slate-900/90 p-3 shadow-xl sm:p-4 lg:col-span-12 xl:col-span-2 xl:flex-col xl:items-center xl:justify-center xl:text-center">
-          <a
-            href={bookingHref}
-            className="block"
-            title="Scan or open the booking page for this clinic and doctor"
-          >
           <div>
             <span className="block text-xs font-black uppercase tracking-wider text-teal-400">
               Scan to book an appointment
@@ -263,7 +253,6 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
               className="block h-full w-full rounded-xl bg-white object-contain p-1"
             />
           </div>
-          </a>
         </div>
       </main>
 

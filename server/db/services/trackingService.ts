@@ -24,6 +24,11 @@ export interface TrackingResult {
   currentlyServingToken?: string;
 }
 
+export const calculatePatientsAhead = (
+  tokens: Array<{ sequenceNumber: number; status: string }>,
+  currentSequenceNumber: number,
+): number => tokens.filter((token) => token.status === 'WAITING' && token.sequenceNumber < currentSequenceNumber).length;
+
 export class TrackingService {
   /**
    * Get public tracking information using the patient's mobile number.
@@ -75,12 +80,11 @@ export class TrackingService {
     await new QueueService().syncDoctorStatusForEmptyQueue(result.clinic_id, result.doctor_id, new Date());
 
     // Calculate patients ahead (waiting tokens with lower sequence number)
-    const waitingStates = ['WAITING'];
     const aheadResult = await executeQueryOne<{ count: number }>(
       `SELECT COUNT(*) AS count FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-       AND status IN (?) AND sequence_number < ?`,
-      [result.clinic_id, result.session_id, result.doctor_id, waitingStates, result.sequence_number]
+       AND status = 'WAITING' AND sequence_number < ?`,
+      [result.clinic_id, result.session_id, result.doctor_id, result.sequence_number]
     );
     const patientsAhead = Number(aheadResult?.count || 0);
 

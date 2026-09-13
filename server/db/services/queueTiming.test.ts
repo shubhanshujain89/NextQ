@@ -11,6 +11,7 @@ import {
 } from './queueService.js';
 import { getClinicDateTimeUtc } from './clinicTime.js';
 import { isSameClinicBusinessDate } from './bookingService.js';
+import { calculatePatientsAhead } from './trackingService.js';
 
 test('queue consultation lifecycle yields a sensible duration and ETA update', () => {
   const calledAt = new Date(Date.now() - 8 * 60 * 1000);
@@ -134,4 +135,17 @@ test('future appointment dates are rejected for same-day queue bookings', () => 
   assert.equal(isSameClinicBusinessDate(undefined, '2026-09-13'), true);
   assert.equal(isSameClinicBusinessDate('2026-09-13', '2026-09-13'), true);
   assert.equal(isSameClinicBusinessDate('2026-09-14', '2026-09-13'), false);
+});
+
+test('tracking position counts only earlier waiting tokens', () => {
+  assert.equal(calculatePatientsAhead([
+    { sequenceNumber: 1, status: 'COMPLETED' },
+    { sequenceNumber: 2, status: 'WAITING' },
+    { sequenceNumber: 3, status: 'CALLED' },
+    { sequenceNumber: 4, status: 'WAITING' },
+  ], 5), 2);
+  assert.equal(calculatePatientsAhead([
+    { sequenceNumber: 1, status: 'WAITING' },
+    { sequenceNumber: 2, status: 'WAITING' },
+  ], 1), 0);
 });
