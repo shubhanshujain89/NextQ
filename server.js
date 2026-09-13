@@ -8,4 +8,7 @@ if (!existsSync('./dist-server/server.js')) {
 	}
 }
 
-await import('./dist-server/server.js');
+import('./dist-server/server.js').catch((error) => {
+	console.error('Unable to start the compiled server:', error);
+	process.exitCode = 1;
+});
