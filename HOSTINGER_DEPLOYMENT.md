@@ -69,6 +69,8 @@ npm run start
 
 **Entry File:** `server.js`
 
+The root launcher also generates `dist-server/server.js` if the hosting platform starts the entry file directly without running the build command first.
+
 **Root Directory:** `/`
 
 ### Step 4: Deploy
