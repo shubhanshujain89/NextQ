@@ -7,7 +7,6 @@ const getTrackingMobileFromQuery = () => {
 };
 
 interface TrackingData {
-  patientName: string;
   clinic: string;
   doctor: string;
   token: string;
@@ -177,7 +176,6 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
                     Doctor: {tracking.doctorStatus === 'IN' ? 'Available' : 'Not started'}
                   </span>
                   <p className="mt-3 text-3xl font-black leading-none tracking-[-0.04em] text-slate-900 sm:text-4xl">{tracking.token}</p>
-                  <p className="mt-2 text-base font-semibold text-slate-800">{tracking.patientName}</p>
                 </div>
               </div>
 

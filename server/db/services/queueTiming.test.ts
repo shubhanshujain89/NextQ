@@ -10,6 +10,7 @@ import {
   getPublicTrackingEstimatedWaitMinutes,
 } from './queueService.js';
 import { getClinicDateTimeUtc } from './clinicTime.js';
+import { isSameClinicBusinessDate } from './bookingService.js';
 
 test('queue consultation lifecycle yields a sensible duration and ETA update', () => {
   const calledAt = new Date(Date.now() - 8 * 60 * 1000);
@@ -127,4 +128,10 @@ test('appointment slot converts to a real clinic-time timestamp', () => {
   const scheduled = getClinicDateTimeUtc('2025-01-15', '7:00 PM - 8:00 PM', 'Asia/Kolkata');
   assert.equal(scheduled?.toISOString(), '2025-01-15T13:30:00.000Z');
   assert.equal(getClinicDateTimeUtc('2025-02-30', '7:00 PM - 8:00 PM', 'Asia/Kolkata'), null);
+});
+
+test('future appointment dates are rejected for same-day queue bookings', () => {
+  assert.equal(isSameClinicBusinessDate(undefined, '2026-09-13'), true);
+  assert.equal(isSameClinicBusinessDate('2026-09-13', '2026-09-13'), true);
+  assert.equal(isSameClinicBusinessDate('2026-09-14', '2026-09-13'), false);
 });

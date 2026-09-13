@@ -389,6 +389,11 @@ export class QueueService {
          FROM \`tokens\` t
          JOIN \`sessions\` s ON s.id = t.session_id
          WHERE t.id = ? AND t.clinic_id = ? AND s.clinic_id = ? AND s.status = 'ACTIVE'
+           AND NOT EXISTS (
+             SELECT 1 FROM appointments a
+             WHERE a.tracking_id = (SELECT p.tracking_id FROM patients p WHERE p.id = t.patient_id)
+               AND a.scheduled_time > CURRENT_TIMESTAMP
+           )
          FOR UPDATE`,
         [tokenId, clinicId, clinicId]
       );

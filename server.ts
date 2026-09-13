@@ -800,6 +800,10 @@ app.post('/api/patient/book', async (req, res) => {
       res.status(400).json({ error: 'Age must be a whole number between 0 and 120.' });
       return;
     }
+    if (normalizedAppointmentDate && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedAppointmentDate)) {
+      res.status(400).json({ error: 'Appointment date must use YYYY-MM-DD format.' });
+      return;
+    }
     const booking = await createPublicBooking({
       clinicId: String(clinicId),
       doctorId: String(doctorId),
@@ -1140,9 +1144,8 @@ app.get('/api/barcodes', async (req, res) => {
   }
 
   try {
-    const records = await repositories.qrCodes.findAll({ orderBy: 'updated_at', orderDirection: 'DESC' });
-    const inventory = await Promise.all(records.map(async (record) => {
-      const doctor = record.doctorId ? await repositories.doctors.findById(record.doctorId) : null;
+    const records = await repositories.qrCodes.findAllWithDoctorNames();
+    const inventory = records.map((record) => {
       return {
         id: record.id,
         barcodeValue: record.code,
@@ -1150,13 +1153,13 @@ app.get('/api/barcodes', async (req, res) => {
         notes: record.notes || '',
         status: record.status,
         assignedDoctorId: record.doctorId || null,
-        assignedDoctorName: doctor?.name || null,
+        assignedDoctorName: record.doctorName || null,
         assignedClinicId: record.clinicId || null,
         assignedAt: record.assignedAt?.toISOString() || null,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
       };
-    }));
+    });
     res.status(200).json(inventory);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to load barcode inventory.' });
@@ -1282,6 +1285,10 @@ app.patch('/api/barcodes/:barcodeId', async (req, res) => {
       updatedAt: updated?.updatedAt.toISOString(),
     });
   } catch (error) {
+    if ((error as any)?.code === 'ER_DUP_ENTRY' || String((error as any)?.message || '').includes('uk_qr_codes_doctor_id')) {
+      res.status(409).json({ error: 'This doctor already has a barcode assigned.' });
+      return;
+    }
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to update barcode assignment.' });
   }
 });
@@ -1354,6 +1361,10 @@ app.delete('/api/barcodes/:barcodeId', async (req, res) => {
     const record = await repositories.qrCodes.findById(String(req.params.barcodeId || ''));
     if (!record) {
       res.status(404).json({ error: 'Barcode not found.' });
+      return;
+    }
+    if (record.status === 'ASSIGNED') {
+      res.status(409).json({ error: 'Assigned QR codes cannot be deleted. Disable the QR code instead.' });
       return;
     }
     await repositories.qrCodes.delete(record.id);

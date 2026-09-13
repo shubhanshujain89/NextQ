@@ -39,6 +39,9 @@ export interface BookingResult {
   doctorName: string;
 }
 
+export const isSameClinicBusinessDate = (appointmentDate: string | undefined, businessDate: string): boolean =>
+  !appointmentDate || appointmentDate === businessDate;
+
 export class BookingService {
   /**
    * Atomically get or create today's active session for a clinic.
@@ -116,6 +119,9 @@ export class BookingService {
 
     const today = new Date();
     const businessDate = getClinicBusinessDate(today, clinic.timezone);
+    if (!isSameClinicBusinessDate(input.appointmentDate, businessDate)) {
+      throw new Error('Bookings are currently available for today only.');
+    }
     const phoneVariants = [
       input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10),
       `+91${input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10)}`,

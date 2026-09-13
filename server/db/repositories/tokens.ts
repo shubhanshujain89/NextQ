@@ -288,6 +288,11 @@ export class TokenRepository extends BaseRepository<Token> {
       const [rows] = await connection.execute(
         `SELECT * FROM \`tokens\`
          WHERE doctor_id = ? AND session_id = ? AND status IN ('WAITING', 'CALLED', 'IN_CONSULTATION', 'SERVING')
+           AND NOT EXISTS (
+             SELECT 1 FROM appointments a
+             WHERE a.tracking_id = (SELECT p.tracking_id FROM patients p WHERE p.id = tokens.patient_id)
+               AND a.scheduled_time > CURRENT_TIMESTAMP
+           )
          ORDER BY priority ASC, sequence_number ASC
          LIMIT 1
          FOR UPDATE`,

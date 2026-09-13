@@ -9,7 +9,6 @@ import { getClinicBusinessDate } from './clinicTime.js';
 import { getPublicTrackingEstimatedWaitMinutes, QueueService } from './queueService.js';
 
 export interface TrackingResult {
-  patientName: string;
   clinic: string;
   doctor: string;
   token: string;
@@ -40,7 +39,6 @@ export class TrackingService {
       SELECT
         c.name AS clinic_name,
         d.name AS doctor_name,
-        p.name AS patient_name,
         t.token_number,
         t.status,
         t.sequence_number,
@@ -158,7 +156,6 @@ export class TrackingService {
     const publicStatus = result.status === 'SERVING' ? 'IN_CONSULTATION' : result.status;
 
     return {
-      patientName: result.patient_name,
       clinic: result.clinic_name,
       doctor: /^Dr\.\s*/i.test(result.doctor_name)
         ? result.doctor_name

@@ -132,7 +132,7 @@ export const getEarliestBookingSchedule = (doctor: Pick<Doctor, 'availableDays' 
   const slots = parseDoctorSlots(doctor.availableHours || '');
   if (!slots.length) return null;
 
-  const nextDates = Array.from({ length: 21 }, (_, index) => {
+  const nextDates = Array.from({ length: 1 }, (_, index) => {
     const date = new Date(referenceDate);
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() + index);
@@ -158,12 +158,7 @@ export const getEarliestBookingSchedule = (doctor: Pick<Doctor, 'availableDays' 
     };
   }
 
-  return {
-    date: nextDates[0],
-    dateLabel: `${toShortWeekday(nextDates[0])}, ${formatScheduleDate(nextDates[0])}`,
-    slots,
-    autoSelectedSlot: slots.length === 1 ? slots[0].value : undefined,
-  };
+  return null;
 };
 
 export const isDuplicateBookingError = (message: string = '') =>

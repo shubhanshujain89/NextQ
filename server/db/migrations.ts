@@ -158,6 +158,49 @@ export async function runMigrations(): Promise<void> {
       );
     }
   };
+  const ensureQrCodeConstraints = async () => {
+    await executeQuery(
+      `UPDATE qr_codes q
+       LEFT JOIN clinics c ON c.id = q.clinic_id
+       SET q.clinic_id = NULL
+       WHERE q.clinic_id IS NOT NULL AND c.id IS NULL`
+    );
+    await executeQuery(
+      `UPDATE qr_codes q
+       LEFT JOIN doctors d ON d.id = q.doctor_id
+       SET q.doctor_id = NULL, q.clinic_id = NULL, q.status = 'AVAILABLE', q.assigned_at = NULL
+       WHERE q.doctor_id IS NOT NULL AND d.id IS NULL`
+    );
+
+    const duplicates = await executeQuery<{ doctor_id: string; keep_id: string }>(
+      `SELECT doctor_id, MIN(id) AS keep_id
+       FROM qr_codes
+       WHERE doctor_id IS NOT NULL
+       GROUP BY doctor_id
+       HAVING COUNT(*) > 1`
+    );
+    for (const duplicate of duplicates) {
+      await executeQuery(
+        `UPDATE qr_codes
+         SET doctor_id = NULL, clinic_id = NULL, status = 'AVAILABLE', assigned_at = NULL
+         WHERE doctor_id = ? AND id <> ?`,
+        [duplicate.doctor_id, duplicate.keep_id]
+      );
+    }
+
+    for (const statement of [
+      `ALTER TABLE qr_codes ADD UNIQUE KEY uk_qr_codes_doctor_id (doctor_id)`,
+      `ALTER TABLE qr_codes ADD CONSTRAINT fk_qr_codes_clinic FOREIGN KEY (clinic_id) REFERENCES clinics(id) ON DELETE SET NULL`,
+      `ALTER TABLE qr_codes ADD CONSTRAINT fk_qr_codes_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE SET NULL`,
+    ]) {
+      try {
+        await executeQuery(statement);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('Duplicate key') && !message.includes('already exists') && !message.includes('Duplicate foreign key')) throw error;
+      }
+    }
+  };
   const ensureDoctorStatusDefault = async () => {
     await executeQuery(`ALTER TABLE clinics ALTER COLUMN doctor_status SET DEFAULT 'OUT'`);
   };
@@ -197,6 +240,7 @@ export async function runMigrations(): Promise<void> {
   await ensureAppointmentSlot();
   await backfillAppointmentTimes();
   await migrateQrInventory();
+  await ensureQrCodeConstraints();
   await ensureDoctorStatusDefault();
 
   await executeQuery(`ALTER TABLE tokens MODIFY token_type ENUM('ONLINE', 'WALK_IN', 'VIP', 'EMERGENCY') DEFAULT 'ONLINE'`);

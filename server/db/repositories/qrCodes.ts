@@ -1,4 +1,5 @@
 import { BaseRepository } from './base.js';
+import { executeQuery } from '../connection.js';
 
 export type QrCodeStatus = 'AVAILABLE' | 'ASSIGNED' | 'DISABLED';
 
@@ -13,6 +14,10 @@ export interface QrCode {
   assignedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface QrCodeWithDoctor extends QrCode {
+  doctorName?: string | null;
 }
 
 export class QrCodeRepository extends BaseRepository<QrCode> {
@@ -53,6 +58,16 @@ export class QrCodeRepository extends BaseRepository<QrCode> {
 
   async findAssignedToDoctor(doctorId: string): Promise<QrCode | null> {
     return this.findOne({ doctor_id: doctorId });
+  }
+
+  async findAllWithDoctorNames(): Promise<QrCodeWithDoctor[]> {
+    const rows = await executeQuery(
+      `SELECT q.*, d.name AS doctor_name
+       FROM qr_codes q
+       LEFT JOIN doctors d ON d.id = q.doctor_id
+       ORDER BY q.updated_at DESC`
+    );
+    return rows.map((row) => ({ ...this.mapRowToEntity(row), doctorName: row.doctor_name || null }));
   }
 }
 

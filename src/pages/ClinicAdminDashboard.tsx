@@ -2056,11 +2056,11 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
                   </button>
 
                   {expandedBarcodeId === item.id && <>
-                    <div className="mt-4 flex justify-end">
+                    {item.status !== 'ASSIGNED' && <div className="mt-4 flex justify-end">
                       <button onClick={() => deleteBarcodeInventoryItem(item.id)} className="inline-flex items-center gap-1 rounded-lg p-2 text-xs font-semibold text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300" title="Delete barcode">
                         <Trash2 className="h-4 w-4" /> Delete
                       </button>
-                    </div>
+                    </div>}
 
                     <div className="mt-1 grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center">
                       <BarcodePreview value={item.barcodeValue} />

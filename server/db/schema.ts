@@ -293,7 +293,9 @@ CREATE TABLE IF NOT EXISTS qr_codes (
 
     INDEX idx_qr_codes_status (status),
     INDEX idx_qr_codes_clinic_id (clinic_id),
-    INDEX idx_qr_codes_doctor_id (doctor_id)
+    UNIQUE KEY uk_qr_codes_doctor_id (doctor_id),
+    FOREIGN KEY (clinic_id) REFERENCES clinics(id) ON DELETE SET NULL,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- WhatsApp Logs table
