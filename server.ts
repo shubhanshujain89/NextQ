@@ -27,7 +27,28 @@ if (sessionSecretError) {
   throw new Error(sessionSecretError);
 }
 
-const databaseReady = getDatabase().then(() => {
+const ensureQrCodeTable = async () => {
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS qr_codes (
+      id VARCHAR(64) PRIMARY KEY,
+      code VARCHAR(64) NOT NULL UNIQUE,
+      label VARCHAR(255) NOT NULL,
+      notes TEXT,
+      status ENUM('AVAILABLE', 'ASSIGNED', 'DISABLED') NOT NULL DEFAULT 'AVAILABLE',
+      clinic_id VARCHAR(64),
+      doctor_id VARCHAR(64),
+      assigned_at DATETIME NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_qr_codes_status (status),
+      INDEX idx_qr_codes_clinic_id (clinic_id),
+      INDEX idx_qr_codes_doctor_id (doctor_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+};
+
+const databaseReady = getDatabase().then(async () => {
+  await ensureQrCodeTable();
   return true;
 }).catch((error) => {
   console.warn('Database unavailable at startup; continuing in degraded mode.', error instanceof Error ? error.message : error);
@@ -777,7 +798,8 @@ app.post('/api/patient/book', async (req, res) => {
     }
     const { clinicId, doctorId, patientName, phone, age, reason, appointmentDate, appointmentSlot, amountPaid, paymentMode, paymentMethod, paymentStatus } = req.body || {};
     const normalizedPatientName = String(patientName || '').trim();
-    const normalizedPhone = String(phone || '').trim();
+    const phoneDigits = String(phone || '').replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    const normalizedPhone = /^\d{10}$/.test(phoneDigits) ? `+91${phoneDigits}` : '';
     const normalizedReason = String(reason || '').trim();
     const normalizedAppointmentSlot = String(appointmentSlot || '').trim();
     const normalizedAppointmentDate = String(appointmentDate || '').trim();

@@ -185,7 +185,11 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
               {activeToken ? 'Please proceed' : 'Waiting for next patient'}
             </h2>
             <p className="text-sm font-medium text-slate-400 sm:text-lg">
-              {activeToken ? <>Please go to <span className="font-bold text-white">{clinic.cabinNumber}</span></> : 'Please watch this screen for your token number'}
+              {activeToken
+                ? clinic.cabinNumber?.trim()
+                  ? <>Please go to <span className="font-bold text-white">{clinic.cabinNumber}</span></>
+                  : 'Please proceed'
+                : 'Please watch this screen for your token number'}
             </p>
           </div>
         </div>

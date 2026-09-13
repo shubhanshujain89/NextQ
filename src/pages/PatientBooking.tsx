@@ -94,6 +94,11 @@ const extractStartTimeFromSlot = (slotValue: string): string | null => {
   return match ? match[1].trim() : null;
 };
 
+const extractEndTimeFromSlot = (slotValue: string): string | null => {
+  const match = String(slotValue || '').match(/-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+  return match ? match[1].trim() : null;
+};
+
 const getClinicAvailabilityStatus = (doctorList: Doctor[] = []) => {
   const allStarts = doctorList
     .flatMap((doctor) => parseDoctorSlots(doctor.availableHours || '').map((slot) => slot.value))
@@ -129,7 +134,10 @@ const syncBookingSelectionUrl = (clinicId?: string, doctorId?: string) => {
 };
 
 export const getEarliestBookingSchedule = (doctor: Pick<Doctor, 'availableDays' | 'availableHours'>, referenceDate = new Date()): EarliestBookingSchedule | null => {
-  const slots = parseDoctorSlots(doctor.availableHours || '');
+  const slots = parseDoctorSlots(doctor.availableHours || '').filter((slot) => {
+    const endTime = extractEndTimeFromSlot(slot.value);
+    return !endTime || parseTimeToMinutes(endTime) > (referenceDate.getHours() * 60 + referenceDate.getMinutes());
+  });
   if (!slots.length) return null;
 
   const nextDates = Array.from({ length: 1 }, (_, index) => {
@@ -204,6 +212,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
   const [selectedAppointmentDate, setSelectedAppointmentDate] = useState<Date | null>(null);
   const [selectedAppointmentSlot, setSelectedAppointmentSlot] = useState<string>('');
   const [generatedTokenNumber, setGeneratedTokenNumber] = useState('');
+  const [, setScheduleClock] = useState(() => Date.now());
   
   const [bookingData, setBookingData] = useState({
     patientName: '',
@@ -227,6 +236,11 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
 
   useEffect(() => {
     fetchClinics();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setScheduleClock(Date.now()), 30_000);
+    return () => window.clearInterval(intervalId);
   }, []);
 
   const fetchClinics = async () => {

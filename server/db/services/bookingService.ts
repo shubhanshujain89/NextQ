@@ -9,7 +9,7 @@ import type mysql from 'mysql2/promise';
 import type { Session } from '../repositories/sessions.js';
 import crypto from 'crypto';
 import { assertActiveClinicPlan } from './planService.js';
-import { getClinicBusinessDate, getClinicDateTimeUtc } from './clinicTime.js';
+import { getClinicBusinessDate, getClinicDateTimeUtc, getClinicLocalMinutes, getSlotEndMinutes } from './clinicTime.js';
 
 export interface BookingInput {
   clinicId: string;
@@ -41,6 +41,21 @@ export interface BookingResult {
 
 export const isSameClinicBusinessDate = (appointmentDate: string | undefined, businessDate: string): boolean =>
   !appointmentDate || appointmentDate === businessDate;
+
+export const isBookingSlotAvailable = (
+  availableHours: string,
+  appointmentSlot: string,
+  now = new Date(),
+  timezone = 'Asia/Kolkata',
+): boolean => {
+  const requestedSlot = String(appointmentSlot || '').trim();
+  const configuredSlots = String(availableHours || '').split(',').map((slot) => slot.trim()).filter(Boolean);
+  const configuredSlot = configuredSlots.find((slot) => slot.toLowerCase() === requestedSlot.toLowerCase());
+  if (!configuredSlot) return false;
+
+  const endMinutes = getSlotEndMinutes(configuredSlot);
+  return endMinutes !== null && getClinicLocalMinutes(now, timezone) < endMinutes;
+};
 
 export class BookingService {
   /**
@@ -122,25 +137,28 @@ export class BookingService {
     if (!isSameClinicBusinessDate(input.appointmentDate, businessDate)) {
       throw new Error('Bookings are currently available for today only.');
     }
-    const phoneVariants = [
-      input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10),
-      `+91${input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10)}`,
-      `91${input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10)}`,
-    ];
+    if (!input.appointmentSlot || !isBookingSlotAvailable(doctor.availableHours || '', input.appointmentSlot, today, clinic.timezone)) {
+      throw new Error('This appointment slot is no longer available. Please choose another timing.');
+    }
+    const normalizedPhone = input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      throw new Error('Enter a valid 10-digit mobile number.');
+    }
 
     // Create patient, token, session (if needed), and appointment in a transaction
     return executeTransaction(async (connection) => {
+      await connection.execute('SELECT id FROM `clinics` WHERE id = ? FOR UPDATE', [input.clinicId]);
       const [existingPatientRows] = await connection.execute(
         `SELECT p.id
          FROM \`patients\` p
          JOIN \`tokens\` t ON t.patient_id = p.id
          JOIN \`sessions\` s ON s.id = t.session_id
-         WHERE p.phone IN (?, ?, ?)
+         WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '+', ''), '-', ''), '(', ''), ')', ''), 10) = ?
            AND p.clinic_id = ?
            AND t.clinic_id = ?
            AND s.date = ?
          LIMIT 1`,
-        [...phoneVariants, input.clinicId, input.clinicId, businessDate]
+        [normalizedPhone, input.clinicId, input.clinicId, businessDate]
       );
       if ((existingPatientRows as any[]).length > 0) {
         throw new Error('A booking is already registered for this mobile number today.');
@@ -155,8 +173,7 @@ export class BookingService {
       const now = new Date();
       const scheduledTime = getClinicDateTimeUtc(input.appointmentDate, input.appointmentSlot, clinic.timezone) || now;
 
-      // Serialize bookings for this clinic before calculating MAX + 1.
-      await connection.execute('SELECT id FROM `clinics` WHERE id = ? FOR UPDATE', [input.clinicId]);
+      // The clinic row lock serializes bookings before calculating MAX + 1.
       const [seqResult] = await connection.execute(
         `SELECT COALESCE(MAX(sequence_number), 0) as max_sequence
          FROM \`tokens\`
@@ -170,7 +187,7 @@ export class BookingService {
       await connection.execute(
         `INSERT INTO \`patients\` (id, clinic_id, tracking_id, name, phone, age, gender, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [patientId, input.clinicId, trackingId, input.patientName.trim(), input.phone.trim(), input.age || null, null, now, now]
+        [patientId, input.clinicId, trackingId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null, null, now, now]
       );
 
       // Create token
@@ -180,7 +197,7 @@ export class BookingService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber,
-          patientId, input.patientName.trim(), input.phone.trim(), input.age || null,
+          patientId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null,
           'ONLINE', 'WAITING', 0, 0, 10, Number(input.amountPaid || 0), input.paymentMode || 'PAY_AT_CLINIC', input.paymentMethod || 'PAY_AT_CLINIC', input.paymentStatus === 'PAID' ? 'PAID' : 'PENDING', now,
           input.reason?.trim() ? JSON.stringify({ symptoms: input.reason.trim() }) : null
         ]
@@ -193,7 +210,7 @@ export class BookingService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(), input.clinicId, input.doctorId, session.id, trackingId,
-          input.patientName.trim(), input.phone.trim(), input.age || null, input.reason?.trim() || null,
+          input.patientName.trim(), `+91${normalizedPhone}`, input.age || null, input.reason?.trim() || null,
           'ONLINE', tokenNumber, sequenceNumber, input.appointmentSlot || null, 'scheduled', scheduledTime, scheduledTime, now, now
         ]
       );

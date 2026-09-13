@@ -10,7 +10,7 @@ import {
   getPublicTrackingEstimatedWaitMinutes,
 } from './queueService.js';
 import { getClinicDateTimeUtc } from './clinicTime.js';
-import { isSameClinicBusinessDate } from './bookingService.js';
+import { isBookingSlotAvailable, isSameClinicBusinessDate } from './bookingService.js';
 import { calculatePatientsAhead } from './trackingService.js';
 
 test('queue consultation lifecycle yields a sensible duration and ETA update', () => {
@@ -135,6 +135,17 @@ test('future appointment dates are rejected for same-day queue bookings', () => 
   assert.equal(isSameClinicBusinessDate(undefined, '2026-09-13'), true);
   assert.equal(isSameClinicBusinessDate('2026-09-13', '2026-09-13'), true);
   assert.equal(isSameClinicBusinessDate('2026-09-14', '2026-09-13'), false);
+});
+
+test('expired booking slots are unavailable while later slots remain bookable', () => {
+  const availableHours = '10:00 AM - 1:00 PM, 7:00 PM - 10:00 PM';
+  const afternoon = new Date('2026-09-13T08:30:00.000Z');
+  const afterEvening = new Date('2026-09-13T17:00:00.000Z');
+
+  assert.equal(isBookingSlotAvailable(availableHours, '10:00 AM - 1:00 PM', afternoon, 'Asia/Kolkata'), false);
+  assert.equal(isBookingSlotAvailable(availableHours, '7:00 PM - 10:00 PM', afternoon, 'Asia/Kolkata'), true);
+  assert.equal(isBookingSlotAvailable(availableHours, '7:00 PM - 10:00 PM', afterEvening, 'Asia/Kolkata'), false);
+  assert.equal(isBookingSlotAvailable(availableHours, '1:00 PM - 2:00 PM', afternoon, 'Asia/Kolkata'), false);
 });
 
 test('tracking position counts only earlier waiting tokens', () => {

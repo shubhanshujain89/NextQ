@@ -25,6 +25,12 @@ const DEFAULT_PLAN_LIMITS = { maxDoctors: 1, maxStaffUsers: 2 };
 
 const calculateExpiryDate = (startDate: Date, durationDays: number) => new Date(startDate.getTime() + Math.max(0, durationDays - 1) * 24 * 60 * 60 * 1000);
 
+const isBeforeCurrentCalendarDate = (date: Date, now: Date): boolean => {
+  const dateKey = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+  const todayKey = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  return dateKey < todayKey;
+};
+
 export const getClinicPlanSnapshot = (clinic: Clinic, now = new Date()): ClinicPlanSnapshot => {
   const startedAt = clinic.subscriptionStartedAt || clinic.createdAt;
   const expiresAt = clinic.subscriptionExpiresAt || calculateExpiryDate(startedAt, 30);
@@ -32,7 +38,7 @@ export const getClinicPlanSnapshot = (clinic: Clinic, now = new Date()): ClinicP
     ? 'PAUSED'
     : !LAUNCH_PLANS.includes(clinic.featurePlan)
       ? 'PAUSED'
-      : expiresAt.getTime() <= now.getTime()
+      : isBeforeCurrentCalendarDate(expiresAt, now)
       ? 'EXPIRED'
       : 'ACTIVE';
   const limits = PLAN_LIMITS[clinic.featurePlan] || DEFAULT_PLAN_LIMITS;

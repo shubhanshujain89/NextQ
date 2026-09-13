@@ -179,7 +179,11 @@ const parseDashboardDate = (value: unknown): Date | null => {
 
 const isExpiredDate = (value: unknown) => {
   const date = parseDashboardDate(value);
-  return Boolean(date && date.getTime() <= Date.now());
+  if (!date) return false;
+  const today = new Date();
+  const dateKey = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+  const todayKey = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  return dateKey < todayKey;
 };
 
 const getEffectiveSubscriptionStatus = (status: unknown, expiryDate: unknown): 'ACTIVE' | 'EXPIRED' | 'PAUSED' => {
@@ -517,7 +521,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       };
 
       await setupUsersListener();
-      void fetchBarcodeInventory();
+      if (resolvedMode === 'site-admin') void fetchBarcodeInventory();
       cleanupListeners = () => {
         clearDashboardTimers();
         listenersRef.current.forEach((unsub) => unsub());

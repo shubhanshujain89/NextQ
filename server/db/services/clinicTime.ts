@@ -1,5 +1,34 @@
 const DEFAULT_CLINIC_TIMEZONE = 'Asia/Kolkata';
 
+const parseClockMinutes = (value: string): number | null => {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return null;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const meridiem = String(match[3] || '').toUpperCase();
+  if (meridiem === 'PM' && hours < 12) hours += 12;
+  if (meridiem === 'AM' && hours === 12) hours = 0;
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+export const getClinicLocalMinutes = (now = new Date(), timezone = DEFAULT_CLINIC_TIMEZONE): number => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: getClinicTimezone(timezone),
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Number(values.hour) * 60 + Number(values.minute);
+};
+
+export const getSlotEndMinutes = (slotValue: string): number | null => {
+  const match = String(slotValue || '').trim().match(/^[^,]+?\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)$/i);
+  return match ? parseClockMinutes(match[1]) : null;
+};
+
 export const getClinicTimezone = (timezone?: string) => timezone || DEFAULT_CLINIC_TIMEZONE;
 
 export const getClinicBusinessDate = (now = new Date(), timezone = DEFAULT_CLINIC_TIMEZONE): string => {
