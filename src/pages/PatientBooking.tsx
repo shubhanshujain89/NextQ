@@ -100,20 +100,26 @@ const extractEndTimeFromSlot = (slotValue: string): string | null => {
 };
 
 const getClinicAvailabilityStatus = (doctorList: Doctor[] = []) => {
-  const allStarts = doctorList
-    .flatMap((doctor) => parseDoctorSlots(doctor.availableHours || '').map((slot) => slot.value))
+  const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const availableStarts = doctorList
+    .flatMap((doctor) => parseDoctorSlots(doctor.availableHours || ''))
+    .filter((slot) => {
+      const endTime = extractEndTimeFromSlot(slot.value);
+      return !endTime || parseTimeToMinutes(endTime) > currentMinutes;
+    })
+    .map((slot) => slot.value)
     .map(extractStartTimeFromSlot)
     .filter((time): time is string => Boolean(time));
 
-  if (!allStarts.length) {
-    return { tone: 'warning' as const, label: 'Moderate wait' };
+  if (!availableStarts.length) {
+    return { tone: 'warning' as const, label: 'No slots remaining today' };
   }
 
   if (doctorList.length >= 2) {
     return { tone: 'success' as const, label: 'Available today' };
   }
 
-  return { tone: 'success' as const, label: `Next available: ${allStarts[0]}` };
+  return { tone: 'success' as const, label: `Next available: ${availableStarts[0]}` };
 };
 
 export const buildBookingSelectionUrl = (
@@ -202,6 +208,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
   );
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [clinicDoctors, setClinicDoctors] = useState<Record<string, Doctor[]>>({});
   const [clinicAvailability, setClinicAvailability] = useState<Record<string, { tone: 'success' | 'warning'; label: string }>>({});
   const [clinicSearch, setClinicSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -239,9 +246,14 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setScheduleClock(Date.now()), 30_000);
+    const intervalId = window.setInterval(() => {
+      setScheduleClock(Date.now());
+      setClinicAvailability(Object.fromEntries(
+        Object.entries(clinicDoctors).map(([clinicId, doctorList]) => [clinicId, getClinicAvailabilityStatus(doctorList)])
+      ));
+    }, 30_000);
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [clinicDoctors]);
 
   const fetchClinics = async () => {
     try {
@@ -252,21 +264,24 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
       const availableClinics = clinicList;
       setClinics(availableClinics);
 
-      const clinicAvailabilityMap = Object.fromEntries(
+      const clinicDoctorMap: Record<string, Doctor[]> = Object.fromEntries(
         await Promise.all(
           availableClinics.map(async (clinic) => {
             try {
               const doctorsResponse = await fetch(`/api/clinics/${encodeURIComponent(clinic.id)}/doctors`);
               const doctorsPayload = await doctorsResponse.json();
               const doctorList = (doctorsResponse.ok ? (doctorsPayload || []) as Doctor[] : []);
-              return [clinic.id, getClinicAvailabilityStatus(doctorList)];
+              return [clinic.id, doctorList];
             } catch {
-              return [clinic.id, getClinicAvailabilityStatus()];
+              return [clinic.id, []];
             }
           })
         )
-      );
-      setClinicAvailability(clinicAvailabilityMap);
+      ) as Record<string, Doctor[]>;
+      setClinicDoctors(clinicDoctorMap);
+      setClinicAvailability(Object.fromEntries(
+        Object.entries(clinicDoctorMap).map(([clinicId, doctorList]) => [clinicId, getClinicAvailabilityStatus(doctorList)])
+      ));
 
       if (linkedClinicId && linkedDoctorId) {
         const availableClinics = clinicList;
@@ -297,6 +312,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
       console.error('Error fetching clinics:', error);
       setClinics([]);
       setDoctors([]);
+      setClinicDoctors({});
       setClinicAvailability({});
       setSelectedClinic(null);
       setSelectedDoctor(null);
