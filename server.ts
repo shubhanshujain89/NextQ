@@ -1795,8 +1795,13 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 });
 
 const startServer = async () => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`NEXTQ backend listening on port ${PORT}`);
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(PORT, '0.0.0.0');
+    server.once('listening', () => {
+      console.log(`NEXTQ backend listening on port ${PORT} (pid ${process.pid})`);
+      resolve();
+    });
+    server.once('error', reject);
   });
 };
 

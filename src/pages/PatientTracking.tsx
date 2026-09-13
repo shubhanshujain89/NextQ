@@ -27,6 +27,8 @@ const getQueuePosition = (tracking: TrackingData | null) => {
   return Math.max(1, tracking.patientsAhead + 1);
 };
 
+const isCompleted = (tracking: TrackingData | null) => tracking?.status === 'COMPLETED';
+
 interface PatientTrackingProps {
   onBack: () => void;
 }
@@ -169,6 +171,9 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
                   <p className="mt-2 text-sm font-semibold text-slate-800">{tracking.doctor}</p>
                   <p className="mt-1 text-sm text-slate-500">{tracking.clinic}</p>
                   {tracking.appointmentSlot && <p className="mt-1 text-sm font-medium text-emerald-700">Booked timing: {tracking.appointmentDate ? `${tracking.appointmentDate} · ` : ''}{tracking.appointmentSlot}</p>}
+                  <p className={`mt-2 text-xs font-bold uppercase tracking-[0.16em] ${isCompleted(tracking) ? 'text-slate-600' : 'text-emerald-700'}`}>
+                    {isCompleted(tracking) ? 'Appointment completed' : tracking.status.replaceAll('_', ' ')}
+                  </p>
                 </div>
                 <div className="min-w-[150px] text-right">
                   <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] ${tracking.doctorStatus === 'IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
@@ -182,19 +187,19 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="min-h-[148px] rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,#ecfdf5_0%,#f8fffd_100%)] p-4 text-center shadow-inner shadow-emerald-100/60 transition hover:border-emerald-300">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Your position</p>
-                  <div className="mt-3 text-5xl font-black tracking-[-0.05em] text-slate-900">#{getQueuePosition(tracking)}</div>
-                  <p className="mt-1 text-sm text-slate-600">in the queue</p>
+                  <div className="mt-3 text-3xl font-black tracking-[-0.05em] text-slate-900">{isCompleted(tracking) ? 'Completed' : `#${getQueuePosition(tracking)}`}</div>
+                  <p className="mt-1 text-sm text-slate-600">{isCompleted(tracking) ? 'Your consultation is complete.' : 'in the queue'}</p>
                 </div>
                 <div className="min-h-[148px] rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/40">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Currently serving</p>
-                  <p className="mt-3 text-2xl font-black text-slate-900">{tracking.currentlyServingToken || 'Not started'}</p>
-                  <p className="mt-1 text-xs text-slate-500">{tracking.currentlyServingToken ? 'The doctor is with this patient.' : 'Waiting for the queue to begin.'}</p>
+                  <p className="mt-3 text-2xl font-black text-slate-900">{isCompleted(tracking) ? 'Completed' : tracking.currentlyServingToken || 'Not started'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{isCompleted(tracking) ? 'No further queue action is needed.' : tracking.currentlyServingToken ? 'The doctor is with this patient.' : 'Waiting for the queue to begin.'}</p>
                 </div>
                 <div className="min-h-[148px] rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 transition hover:border-emerald-300 hover:bg-emerald-50">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Estimated appointment</p>
-                  <p className="mt-3 text-2xl font-black text-slate-900">Around {tracking.estimatedConsultationTime}</p>
-                  {tracking.doctorStatus === 'IN' && <p className="mt-1 text-xs text-slate-500">Wait: ~{tracking.estimatedWaitMinutes} min</p>}
-                  <p className="mt-2 text-xs text-slate-500">Approximate time based on your booking and clinic schedule.</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">{isCompleted(tracking) ? 'Appointment status' : 'Estimated appointment'}</p>
+                  <p className="mt-3 text-2xl font-black text-slate-900">{isCompleted(tracking) ? 'Completed' : `Around ${tracking.estimatedConsultationTime}`}</p>
+                  {!isCompleted(tracking) && tracking.doctorStatus === 'IN' && <p className="mt-1 text-xs text-slate-500">Wait: ~{tracking.estimatedWaitMinutes} min</p>}
+                  <p className="mt-2 text-xs text-slate-500">{isCompleted(tracking) ? 'This appointment has already been completed.' : 'Approximate time based on your booking and clinic schedule.'}</p>
                 </div>
               </div>
 
