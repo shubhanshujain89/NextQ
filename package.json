@@ -15,8 +15,8 @@
     "build": "npm run lint && npm run build:frontend && npm run build:server",
     "test": "node scripts/run-tests.mjs",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "start": "node dist-server/server.js",
-    "clean": "node -e \"const fs=require('fs');['dist','dist-server','server.js'].forEach((p)=>fs.existsSync(p)&&fs.rmSync(p,{recursive:true,force:true}))\"",
+    "start": "node server.js",
+    "clean": "node -e \"const fs=require('fs');['dist','dist-server'].forEach((p)=>fs.existsSync(p)&&fs.rmSync(p,{recursive:true,force:true}))\"",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit",
     "db:migrate": "node ./node_modules/tsx/dist/cli.mjs server/db/migrations.ts migrate",
     "db:reset": "node ./node_modules/tsx/dist/cli.mjs server/db/migrations.ts reset"

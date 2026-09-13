@@ -10,6 +10,7 @@ build/
 *.js
 *.jsx
 !server.ts
+!server.js
 !vite.config.ts
 
 # Environment variables

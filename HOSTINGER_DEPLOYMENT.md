@@ -65,7 +65,9 @@ npm ci && npm run build
 npm run start
 ```
 
-**Build Output:** `dist/` and `dist-server/` (both are required by `npm run start`)
+**Build Output:** `dist/` and `dist-server/` (both are required by `npm run build`)
+
+**Entry File:** `server.js`
 
 **Root Directory:** `/`
 
