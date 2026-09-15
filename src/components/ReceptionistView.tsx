@@ -353,7 +353,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
           </button>
           <button
             onClick={handleCallNextToken}
-            disabled={isAdvancing || waitingTokens.length === 0 || Boolean(activeToken)}
+            disabled={isAdvancing || waitingTokens.length === 0}
             className="bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-black p-4 rounded-2xl disabled:opacity-50"
           >
             <Play className="w-5 h-5 mb-2 mx-auto" />
@@ -450,7 +450,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
         {/* Button 1: Call Next Token */}
         <button
           onClick={handleCallNextToken}
-          disabled={isAdvancing || waitingTokens.length === 0 || Boolean(activeToken)}
+          disabled={isAdvancing || waitingTokens.length === 0}
           className="col-span-2 min-h-20 sm:col-span-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold p-3.5 rounded-2xl flex flex-col items-center justify-center text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed lg:aspect-square"
         >
           <Play className="mb-2 h-6 w-6 text-slate-950" />
