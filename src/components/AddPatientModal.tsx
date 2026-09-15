@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   UserPlus, 
   IndianRupee, 
@@ -26,8 +26,39 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
   const [patientGender, setPatientGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [isEmergency, setIsEmergency] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI' | 'CARD'>('CASH');
-  const timingOptions = String(clinic.availableHours || '').split(',').map((slot) => slot.trim()).filter(Boolean);
-  const [appointmentSlot, setAppointmentSlot] = useState(timingOptions.length === 1 ? timingOptions[0] : '');
+  const allTimingOptions = String(clinic.availableHours || '').split(',').map((slot) => slot.trim()).filter(Boolean);
+  const [currentMinutes, setCurrentMinutes] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
+  const parseTimeToMinutes = (value: string) => {
+    const match = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!match) return null;
+    let hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const suffix = String(match[3] || '').toUpperCase();
+    if (suffix === 'PM' && hours < 12) hours += 12;
+    if (suffix === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+  const getEndMinutes = (slot: string) => {
+    const match = slot.match(/-\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    return match ? parseTimeToMinutes(match[1]) : null;
+  };
+  const timingOptions = allTimingOptions.filter((slot) => {
+    const endMinutes = getEndMinutes(slot);
+    return endMinutes === null || endMinutes > currentMinutes;
+  });
+  const [appointmentSlot, setAppointmentSlot] = useState('');
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = new Date();
+      setCurrentMinutes(now.getHours() * 60 + now.getMinutes());
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    setAppointmentSlot((currentSlot) => timingOptions.includes(currentSlot) ? currentSlot : (timingOptions[0] || ''));
+  }, [currentMinutes, timingOptions.join('|')]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
