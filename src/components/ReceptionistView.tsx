@@ -241,6 +241,22 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
     }
   };
 
+  const handleDeleteConsultation = async (token: TokenItem) => {
+    if (!window.confirm(`Delete the consultation for ${token.patientName}?`)) return;
+    try {
+      const response = await fetch(`/api/staff/queue/${encodeURIComponent(token.id)}/cancel`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to delete consultation.');
+      onTokenUpdated(payload);
+      showToast(`Deleted consultation for ${token.patientName}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to delete consultation.');
+    }
+  };
+
   // Hold / No-Show active token
   const handleHoldActiveToken = async () => {
     if (!activeToken) {
@@ -683,6 +699,17 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
                               className="p-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500 text-teal-300 hover:text-slate-950 transition-colors"
                             >
                               <Play className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {(token.status === 'WAITING' || token.status === 'HOLD') && (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteConsultation(token)}
+                              title="Delete consultation"
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           )}
 

@@ -781,15 +781,15 @@ app.patch('/api/staff/clinic/:clinicId/cabin', async (req, res) => {
 app.delete('/api/staff/queue/:tokenId/cancel', async (req, res) => {
   try {
     const context = await authContext(req);
-    if (!context || !context.clinicId || context.role !== 'DOCTOR') {
-      res.status(403).json({ error: 'Only the doctor can cancel a consultation.' });
+    if (!context || !context.clinicId || !['DOCTOR', 'STAFF', 'CLINIC_ADMIN'].includes(context.role)) {
+      res.status(403).json({ error: 'You are not authorized to cancel this consultation.' });
       return;
     }
     if (!await requireActivePlan(res, context.clinicId, context.role)) return;
     const token = await services.queue.cancelTokenForClinic(
       String(req.params.tokenId || ''),
       context.clinicId,
-      context.doctorId || undefined
+      context.role === 'DOCTOR' ? context.doctorId || undefined : undefined
     );
     if (!token) {
       res.status(409).json({ error: 'Only waiting or held patients can be cancelled.' });
