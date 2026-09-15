@@ -31,6 +31,15 @@ interface InventoryDoctor {
   status?: string;
 }
 
+interface ClinicSummaryRow {
+  clinicId?: string;
+  clinic: string;
+  walkIns: number;
+  online: number;
+  followUps: number;
+  noShows: number;
+}
+
 const BarcodePreview: React.FC<{ value: string }> = ({ value }) => {
   const qrUrl = buildQrPublicUrl(value);
   const [qrImageUrl, setQrImageUrl] = useState('');
@@ -268,6 +277,8 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string; role: string; status: 'Active' | 'Offline' | 'Pending'; clinicId?: string; clinicName?: string; phone?: string; doctorId?: string; accessStatus?: 'Granted' | 'Hold' | 'Denied'; photoURL?: string; passwordReset?: string; source?: 'staff_users' | 'doctors' }>>([]);
   const [inventoryDoctors, setInventoryDoctors] = useState<InventoryDoctor[]>([]);
   const [barcodeInventory, setBarcodeInventory] = useState<BarcodeInventoryItem[]>([]);
+  const [barcodeInventoryError, setBarcodeInventoryError] = useState('');
+  const [clinicSummary, setClinicSummary] = useState<ClinicSummaryRow[]>([]);
   const [expandedBarcodeId, setExpandedBarcodeId] = useState<string | null>(null);
   const [barcodeForm, setBarcodeForm] = useState({ barcodeValue: '', label: '', notes: '' });
   const [loading, setLoading] = useState(true);
@@ -521,7 +532,10 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       };
 
       await setupUsersListener();
-      if (resolvedMode === 'site-admin') void fetchBarcodeInventory();
+      if (resolvedMode === 'site-admin') {
+        void fetchBarcodeInventory();
+        void fetchClinicSummary();
+      }
       cleanupListeners = () => {
         clearDashboardTimers();
         listenersRef.current.forEach((unsub) => unsub());
@@ -638,6 +652,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
 
   const fetchBarcodeInventory = async () => {
     try {
+      setBarcodeInventoryError('');
       const [barcodeResponse, doctorSnapshot] = await Promise.all([
         fetch('/api/barcodes', { credentials: 'include' }),
         getDocs(collection(db, 'doctors')),
@@ -656,7 +671,22 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       }).filter((doctor) => doctor.status === 'active'));
     } catch (error) {
       console.error('Error fetching barcode inventory:', error);
+      setBarcodeInventoryError(error instanceof Error ? error.message : 'Unable to load barcode inventory.');
       setBarcodeInventory([]);
+    }
+  };
+
+  const fetchClinicSummary = async () => {
+    if (resolvedMode !== 'site-admin') return;
+    try {
+      const params = new URLSearchParams({ start: summaryDateRange.start, end: summaryDateRange.end });
+      const response = await fetch(`/api/admin/clinic-summary?${params.toString()}`, { credentials: 'include' });
+      const payload = await response.json().catch(() => ([]));
+      if (!response.ok) throw new Error(payload.error || `Clinic summary request failed (${response.status})`);
+      setClinicSummary(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error('Error fetching clinic summary:', error);
+      setClinicSummary([]);
     }
   };
 
@@ -1476,9 +1506,10 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
     window.alert('Enterprise report export started.');
   };
 
+  const summaryRows = resolvedMode === 'site-admin' ? clinicSummary : clinicAppointmentSummary;
   const summaryClinicOptions = Array.from(new Set([
     ...clinics.map((clinic) => clinic.name),
-    ...clinicAppointmentSummary.map((clinic) => clinic.clinic),
+    ...summaryRows.map((clinic) => clinic.clinic),
   ].filter(Boolean))).sort((left, right) => left.localeCompare(right));
 
   useEffect(() => {
@@ -1487,17 +1518,12 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
     }
   }, [selectedClinicSummary, summaryClinicOptions]);
 
-  const dateRangeMultiplier = (() => {
-    const start = new Date(summaryDateRange.start);
-    const end = new Date(summaryDateRange.end);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-      return 1;
-    }
-    return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1);
-  })();
+  useEffect(() => {
+    if (resolvedMode === 'site-admin') void fetchClinicSummary();
+  }, [resolvedMode, summaryDateRange.start, summaryDateRange.end]);
 
-  const selectedClinicSummaryData = clinicAppointmentSummary.find((clinic) => clinic.clinic === selectedClinicSummary)
-    ?? clinicAppointmentSummary[0]
+  const selectedClinicSummaryData = summaryRows.find((clinic) => clinic.clinic === selectedClinicSummary)
+    ?? summaryRows[0]
     ?? {
       clinic: summaryClinicOptions[0] || 'No clinic selected',
       walkIns: 0,
@@ -1506,13 +1532,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       noShows: 0,
     };
 
-  const filteredClinicSummaryData = {
-    ...selectedClinicSummaryData,
-    walkIns: Math.max(0, Math.round(selectedClinicSummaryData.walkIns * dateRangeMultiplier / 7)),
-    online: Math.max(0, Math.round(selectedClinicSummaryData.online * dateRangeMultiplier / 7)),
-    followUps: Math.max(0, Math.round(selectedClinicSummaryData.followUps * dateRangeMultiplier / 7)),
-    noShows: Math.max(0, Math.round(selectedClinicSummaryData.noShows * dateRangeMultiplier / 7)),
-  };
+  const filteredClinicSummaryData = selectedClinicSummaryData;
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -2031,6 +2051,15 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
                 </button>
               </div>
             </div>
+
+            {barcodeInventoryError && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                <span>{barcodeInventoryError}</span>
+                <button type="button" onClick={() => void fetchBarcodeInventory()} className="rounded-lg bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/30">
+                  Retry
+                </button>
+              </div>
+            )}
 
             <div className="grid gap-4 lg:grid-cols-2">
               {barcodeInventory.length === 0 ? (

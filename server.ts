@@ -1710,6 +1710,52 @@ app.get('/api/queue-summary', async (req, res) => {
   }
 });
 
+app.get('/api/admin/clinic-summary', async (req, res) => {
+  try {
+    const context = await authContext(req);
+    if (!context || context.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Only Super Admin can access clinic summaries.' });
+      return;
+    }
+    const start = String(req.query.start || '').trim();
+    const end = String(req.query.end || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+      res.status(400).json({ error: 'A valid summary date range is required.' });
+      return;
+    }
+    const rows = await executeQuery<{
+      clinic_id: string;
+      clinic_name: string;
+      walk_ins: number;
+      online: number;
+      follow_ups: number;
+      no_shows: number;
+    }>(
+      `SELECT c.id AS clinic_id, c.name AS clinic_name,
+              SUM(CASE WHEN a.appointment_type IN ('WALK_IN', 'EMERGENCY') THEN 1 ELSE 0 END) AS walk_ins,
+              SUM(CASE WHEN a.appointment_type = 'ONLINE' THEN 1 ELSE 0 END) AS online,
+              SUM(CASE WHEN a.appointment_type = 'FOLLOW_UP' THEN 1 ELSE 0 END) AS follow_ups,
+              SUM(CASE WHEN a.status IN ('no_show', 'NO_SHOW') THEN 1 ELSE 0 END) AS no_shows
+       FROM appointments a
+       JOIN clinics c ON c.id = a.clinic_id
+       WHERE DATE(a.created_at) BETWEEN ? AND ?
+       GROUP BY c.id, c.name
+       ORDER BY c.name ASC`,
+      [start, end]
+    );
+    res.status(200).json(rows.map((row) => ({
+      clinicId: row.clinic_id,
+      clinic: row.clinic_name || 'Unnamed clinic',
+      walkIns: Number(row.walk_ins || 0),
+      online: Number(row.online || 0),
+      followUps: Number(row.follow_ups || 0),
+      noShows: Number(row.no_shows || 0),
+    })));
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to load clinic summary.' });
+  }
+});
+
 // Site Settings API
 app.get('/api/site/settings', async (_req, res) => {
   try {
