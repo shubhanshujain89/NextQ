@@ -458,7 +458,7 @@ app.get('/api/staff/queue/:clinicId', async (req, res) => {
       ? activeDoctors.filter((doctor) => doctor.id === context.doctorId)
       : activeDoctors;
     if (session) {
-      await repositories.tokens.cancelExpiredScheduledTokens(session.id);
+      await repositories.tokens.restoreAutoCancelledScheduledTokens(session.id);
     }
     const displayedDoctor = context.role === 'DOCTOR'
       ? scopedDoctors[0]

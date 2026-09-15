@@ -192,12 +192,12 @@ export class TokenRepository extends BaseRepository<Token> {
     return this.query(sql, [doctorId, sessionId]);
   }
 
-  async cancelExpiredScheduledTokens(sessionId: string, now = new Date()): Promise<void> {
+  async restoreAutoCancelledScheduledTokens(sessionId: string, now = new Date()): Promise<void> {
     await executeQuery(
       `UPDATE \`tokens\` t
        JOIN \`appointments\` a ON a.session_id = t.session_id AND a.token_number = t.token_number
-       SET t.status = 'CANCELLED', a.status = 'cancelled', a.updated_at = ?
-       WHERE t.session_id = ? AND t.status IN ('WAITING', 'HOLD')
+       SET t.status = 'WAITING', t.is_hold = 0, a.status = 'scheduled', a.updated_at = ?
+       WHERE t.session_id = ? AND t.status = 'CANCELLED' AND a.status = 'cancelled'
          AND a.scheduled_time IS NOT NULL AND a.scheduled_time <= ?`,
       [now, sessionId, now]
     );
