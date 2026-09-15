@@ -233,6 +233,10 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
 
   const timingOptions = Array.from(new Set(tokens.map((token) => token.scheduledSlot).filter(Boolean))) as string[];
   const scopedTokens = selectedScheduledSlot === 'ALL' ? tokens : tokens.filter((token) => token.scheduledSlot === selectedScheduledSlot);
+  const patientCountForTiming = (slot: string) => tokens.filter((token) => (
+    token.status !== 'CANCELLED' && token.status !== 'NO_SHOW' &&
+    (slot === 'ALL' || token.scheduledSlot === slot)
+  )).length;
 
   // Filter queues
   const activeToken = scopedTokens.find(t => (
@@ -398,7 +402,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
           <span className="mr-1 text-xs font-bold uppercase tracking-wider text-slate-400">Timing</span>
           {['ALL', ...timingOptions].map((slot) => (
             <button key={slot} type="button" onClick={() => setSelectedScheduledSlot(slot)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${selectedScheduledSlot === slot ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              {slot === 'ALL' ? 'All timings' : slot}
+              {slot === 'ALL' ? 'All timings' : slot} ({patientCountForTiming(slot)})
             </button>
           ))}
         </div>
@@ -464,7 +468,9 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
           title="View all patient details"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Patients</span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Total Patients{selectedScheduledSlot !== 'ALL' ? ` - ${selectedScheduledSlot}` : ''}
+            </span>
             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
               <Users className="w-4 h-4" />
             </div>
