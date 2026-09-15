@@ -6,7 +6,7 @@
 import { repositories } from '../repositories/index.js';
 import type { Token } from '../repositories/tokens.js';
 import { executeQuery, executeQueryOne, executeTransaction } from '../connection.js';
-import { getClinicTimezone } from './clinicTime.js';
+import { getClinicLocalMinutes, getClinicTimezone, getSlotEndMinutes } from './clinicTime.js';
 
 export interface QueueStats {
   waiting: number;
@@ -554,8 +554,8 @@ export class QueueService {
   }
 
   async syncDoctorStatusForEmptyQueue(clinicId: string, doctorId?: string, now = new Date()): Promise<boolean> {
-    const clinic = await executeQueryOne<{ operating_hours: string; doctor_status: string }>(
-      `SELECT operating_hours, doctor_status FROM clinics WHERE id = ?`,
+    const clinic = await executeQueryOne<{ operating_hours: string; doctor_status: string; timezone?: string }>(
+      `SELECT operating_hours, doctor_status, timezone FROM clinics WHERE id = ?`,
       [clinicId]
     );
     if (!clinic || ['OUT', 'ON_BREAK', 'EMERGENCY'].includes(clinic.doctor_status)) {
@@ -573,7 +573,18 @@ export class QueueService {
     const queueResult = await executeQueryOne<{ total: number }>(queueQuery, params);
     const hasQueuePatients = Number(queueResult?.total || 0) > 0;
 
-    if (!shouldAutoMarkDoctorOut({ operatingHours: clinic.operating_hours, hasQueuePatients, now })) {
+    const doctorQuery = doctorId
+      ? 'SELECT available_hours FROM doctors WHERE id = ? AND clinic_id = ?'
+      : 'SELECT available_hours FROM doctors WHERE clinic_id = ? AND status = \'active\'';
+    const doctorParams = doctorId ? [doctorId, clinicId] : [clinicId];
+    const doctors = await executeQuery<{ available_hours?: string }>(doctorQuery, doctorParams);
+    const timingEnds = doctors
+      .flatMap((doctor) => String(doctor.available_hours || '').split(',').map((slot) => getSlotEndMinutes(slot.trim())))
+      .filter((endMinutes): endMinutes is number => endMinutes !== null);
+    const clinicMinutes = getClinicLocalMinutes(now, getClinicTimezone(clinic.timezone));
+    const timingsCompleted = timingEnds.length > 0 && timingEnds.every((endMinutes) => clinicMinutes >= endMinutes);
+
+    if (hasQueuePatients || !timingsCompleted) {
       return false;
     }
 
