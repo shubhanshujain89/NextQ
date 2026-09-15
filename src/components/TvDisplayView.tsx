@@ -110,8 +110,12 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
               <span className="truncate font-black text-2xl text-white sm:text-3xl lg:text-4xl">{clinic.name}</span>
               <span className="text-slate-500">•</span>
               <span className="text-teal-300 font-black text-xl sm:text-2xl lg:text-3xl">{formatDoctorName(clinic.doctorName)}</span>
-              <span className="text-slate-500">•</span>
-              <span className="text-slate-300 font-semibold text-sm sm:text-base">{clinic.cabinNumber}</span>
+              {clinic.cabinNumber?.trim() && (
+                <>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-300 font-semibold text-sm sm:text-base">{clinic.cabinNumber}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -181,16 +185,18 @@ export const TvDisplayView: React.FC<TvDisplayViewProps> = ({
 
           {/* Patient Details */}
           <div className="mt-3 space-y-2">
-            <h2 className="text-2xl font-black text-teal-300 sm:text-3xl lg:text-4xl">
-              {activeToken ? 'Please proceed' : 'Waiting for next patient'}
-            </h2>
-            <p className="text-sm font-medium text-slate-400 sm:text-lg">
-              {activeToken
-                ? clinic.cabinNumber?.trim()
+            {activeToken && clinic.cabinNumber?.trim() ? (
+              <h2 className="text-2xl font-black text-teal-300 sm:text-3xl lg:text-4xl">Please proceed</h2>
+            ) : !activeToken ? (
+              <h2 className="text-2xl font-black text-teal-300 sm:text-3xl lg:text-4xl">Waiting for next patient</h2>
+            ) : null}
+            {(activeToken && clinic.cabinNumber?.trim()) || !activeToken ? (
+              <p className="text-sm font-medium text-slate-400 sm:text-lg">
+                {activeToken
                   ? <>Please go to <span className="font-bold text-white">{clinic.cabinNumber}</span></>
-                  : 'Please proceed'
-                : 'Please watch this screen for your token number'}
-            </p>
+                  : 'Please watch this screen for your token number'}
+              </p>
+            ) : null}
           </div>
         </div>
 

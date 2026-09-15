@@ -219,7 +219,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
       showToast(`Called Token #${nextToken.tokenNumber} (${nextToken.patientName}) to Cabin!`);
     } catch (err) {
       console.error('Error calling next token:', err);
-      showToast('Failed to advance token. Check connection.');
+      showToast(err instanceof Error ? err.message : 'Failed to advance token. Check connection.');
     } finally {
       setIsAdvancing(false);
     }
