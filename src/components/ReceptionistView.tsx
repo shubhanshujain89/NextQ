@@ -31,6 +31,7 @@ interface ReceptionistViewProps {
   clinic: Clinic;
   session: QueueSession | null;
   tokens: TokenItem[];
+  onTokenUpdated: (token: Partial<TokenItem> & Pick<TokenItem, 'id'>) => void;
   onOpenAddWalkIn: () => void;
   onOpenDelayBroadcast: () => void;
 }
@@ -39,6 +40,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
   clinic,
   session,
   tokens,
+  onTokenUpdated,
   onOpenAddWalkIn,
   onOpenDelayBroadcast,
 }) => {
@@ -212,6 +214,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
 
       // Sound announcement
       soundManager.announceToken(nextToken.tokenNumber, nextToken.patientName, clinic.cabinNumber);
+      onTokenUpdated(payload);
 
       showToast(`Called Token #${nextToken.tokenNumber} (${nextToken.patientName}) to Cabin!`);
     } catch (err) {
@@ -230,6 +233,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Unable to update payment status.');
+      onTokenUpdated(payload);
       showToast(`Payment marked paid for #${token.tokenNumber}.`);
     } catch (error) {
       console.error('Error updating payment status:', error);
@@ -260,8 +264,11 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
         });
         const nextPayload = await nextResponse.json().catch(() => ({}));
         if (!nextResponse.ok) throw new Error(nextPayload.error || 'Unable to call next token.');
+        onTokenUpdated(nextPayload);
         soundManager.announceToken(nextToken.tokenNumber, nextToken.patientName, clinic.cabinNumber);
       }
+
+      onTokenUpdated(payload);
 
       showToast(`Token #${activeToken.tokenNumber} placed ON HOLD. Queue advanced.`);
     } catch (err) {
@@ -278,6 +285,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Unable to resume token.');
+      onTokenUpdated(payload);
       showToast(`Token #${token.tokenNumber} reactivated at the top of the waiting queue!`);
     } catch (err) {
       console.error('Error reactivating token:', err);
@@ -293,6 +301,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Unable to set emergency priority.');
+      onTokenUpdated(payload);
       soundManager.playEmergencyChime();
       showToast(`Emergency priority set for ${token.patientName}.`);
     } catch (err) {
@@ -312,6 +321,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
       if (!response.ok) throw new Error(payload.error || 'Unable to call token.');
 
       soundManager.announceToken(token.tokenNumber, token.patientName, clinic.cabinNumber);
+      onTokenUpdated(payload);
       showToast(`Directly calling Token #${token.tokenNumber} to Cabin!`);
     } catch (err) {
       console.error('Error direct calling token:', err);
@@ -343,7 +353,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
           </button>
           <button
             onClick={handleCallNextToken}
-            disabled={isAdvancing || waitingTokens.length === 0}
+            disabled={isAdvancing || waitingTokens.length === 0 || Boolean(activeToken)}
             className="bg-gradient-to-r from-teal-500 to-emerald-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-black p-4 rounded-2xl disabled:opacity-50"
           >
             <Play className="w-5 h-5 mb-2 mx-auto" />
@@ -440,7 +450,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
         {/* Button 1: Call Next Token */}
         <button
           onClick={handleCallNextToken}
-          disabled={isAdvancing || waitingTokens.length === 0}
+          disabled={isAdvancing || waitingTokens.length === 0 || Boolean(activeToken)}
           className="col-span-2 min-h-20 sm:col-span-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold p-3.5 rounded-2xl flex flex-col items-center justify-center text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed lg:aspect-square"
         >
           <Play className="mb-2 h-6 w-6 text-slate-950" />
@@ -666,7 +676,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
                         <div className="flex items-center justify-end space-x-1.5">
                           
                           {/* Call Now */}
-                          {!isServing && !isCompleted && (
+                          {token.status === 'WAITING' && (
                             <button
                               onClick={() => handleDirectCallToken(token)}
                               title="Directly Call to Cabin"

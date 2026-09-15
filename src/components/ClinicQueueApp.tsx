@@ -29,6 +29,8 @@ interface ClinicQueueAppProps {
   onLogout: () => void;
 }
 
+type QueueTokenUpdate = Partial<TokenItem> & Pick<TokenItem, 'id'>;
+
 export function ClinicQueueApp({ userId, role, clinicId: selectedClinicId, onLogout }: ClinicQueueAppProps) {
   const [currentRole, setCurrentRole] = useState<UserRole>(() => (
     new URLSearchParams(window.location.search).get('view') === 'tv' ? 'TV_DISPLAY' : 'DOCTOR'
@@ -46,6 +48,12 @@ export function ClinicQueueApp({ userId, role, clinicId: selectedClinicId, onLog
   // Modals state
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
+
+  const handleTokenUpdated = (updatedToken: QueueTokenUpdate) => {
+    setTokens((currentTokens) => currentTokens.map((token) => (
+      token.id === updatedToken.id ? { ...token, ...updatedToken } : token
+    )));
+  };
 
   useEffect(() => {
     setClinicId(selectedClinicId || '');
@@ -259,6 +267,7 @@ export function ClinicQueueApp({ userId, role, clinicId: selectedClinicId, onLog
               clinic={clinic}
               session={session}
               tokens={tokens}
+              onTokenUpdated={handleTokenUpdated}
               onOpenAddWalkIn={() => setIsAddPatientOpen(true)}
               onOpenDelayBroadcast={() => setIsDelayModalOpen(true)}
             />
