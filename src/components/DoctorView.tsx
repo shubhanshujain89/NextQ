@@ -17,6 +17,7 @@ import {
   Calendar,
   Eye,
   Volume2,
+  VolumeX,
   Edit3,
   Scale,
   Thermometer,
@@ -55,6 +56,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPatientListOpen, setIsPatientListOpen] = useState(false);
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedScheduledSlot, setSelectedScheduledSlot] = useState('ALL');
 
   // Doctor editing patient details state
@@ -306,7 +308,9 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Unable to call the next token.');
 
-        soundManager.announceToken(nextToken.tokenNumber, nextToken.patientName, clinic.cabinNumber);
+        if (soundEnabled) {
+          soundManager.announceToken(nextToken.tokenNumber, nextToken.patientName, clinic.cabinNumber);
+        }
         showToast(`Called Token #${nextToken.tokenNumber} (${nextToken.patientName}) to Cabin!`);
       } else {
         showToast('Consultation completed successfully.');
@@ -607,14 +611,34 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
                     <span>Complete Consultation & Call Next Token</span>
                   </button>
 
-                  <button
-                    onClick={() => soundManager.announceToken(activeToken.tokenNumber, activeToken.patientName, clinic.cabinNumber)}
-                    className="px-4 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-xs font-semibold flex items-center justify-center space-x-1.5"
-                    title="Re-announce token on waiting room speakers"
-                  >
-                    <Volume2 className="w-4 h-4 text-teal-400" />
-                    <span>Re-Announce</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextSoundEnabled = !soundEnabled;
+                        setSoundEnabled(nextSoundEnabled);
+                        if (nextSoundEnabled && activeToken) {
+                          soundManager.announceToken(activeToken.tokenNumber, activeToken.patientName, clinic.cabinNumber);
+                        }
+                      }}
+                      className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-3.5 text-slate-200 transition hover:bg-slate-700"
+                      title={soundEnabled ? 'Mute announcements' : 'Enable announcements'}
+                      aria-label={soundEnabled ? 'Mute announcements' : 'Enable announcements'}
+                    >
+                      {soundEnabled ? <Volume2 className="h-4 w-4 text-teal-400" /> : <VolumeX className="h-4 w-4 text-slate-500" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (soundEnabled) soundManager.announceToken(activeToken.tokenNumber, activeToken.patientName, clinic.cabinNumber);
+                      }}
+                      disabled={!soundEnabled}
+                      className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Re-announce token on waiting room speakers"
+                    >
+                      Re-Announce
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

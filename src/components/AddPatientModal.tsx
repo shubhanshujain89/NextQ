@@ -4,9 +4,6 @@ import {
   IndianRupee, 
   ShieldAlert,
   X,
-  Scale,
-  Thermometer,
-  Activity
 } from 'lucide-react';
 import { Clinic, TokenItem } from '../types/queue';
 import { soundManager } from '../lib/audio';
@@ -23,7 +20,6 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
   onClose,
   onAdded,
 }) => {
-  const isBasicPlan = String(clinic.featurePlan || '').toUpperCase() === 'BASIC';
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [patientAge, setPatientAge] = useState('42');
@@ -33,13 +29,6 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
   const timingOptions = String(clinic.availableHours || '').split(',').map((slot) => slot.trim()).filter(Boolean);
   const [appointmentSlot, setAppointmentSlot] = useState(timingOptions.length === 1 ? timingOptions[0] : '');
   
-  // Optional Vitals & Reception Notes (with predefined units)
-  const [weight, setWeight] = useState('');
-  const [temperature, setTemperature] = useState('');
-  const [oxygenSaturation, setOxygenSaturation] = useState('');
-  const [bpSystolic, setBpSystolic] = useState('');
-  const [bpDiastolic, setBpDiastolic] = useState('');
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -58,15 +47,6 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
       if (timingOptions.length > 1 && !appointmentSlot) {
         throw new Error('Select an appointment timing.');
       }
-
-      const formattedWeight = !isBasicPlan && weight.trim() ? `${weight.trim()} kg` : undefined;
-      const formattedTemp = !isBasicPlan && temperature.trim() ? `${temperature.trim()} °F` : undefined;
-      const formattedSpO2 = !isBasicPlan && oxygenSaturation.trim() ? `${oxygenSaturation.trim()}%` : undefined;
-      const formattedBp = !isBasicPlan && (bpSystolic.trim() || bpDiastolic.trim())
-        ? bpSystolic.trim() && bpDiastolic.trim()
-          ? `${bpSystolic.trim()}/${bpDiastolic.trim()} mmHg`
-          : `${bpSystolic.trim() || bpDiastolic.trim()} mmHg`
-        : undefined;
 
       const response = await fetch(`/api/staff/queue/${encodeURIComponent(clinic.id)}/walk-in`, {
         method: 'POST',
@@ -105,10 +85,6 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
         paymentMethod,
         paymentStatus: 'PAID',
         createdAt: new Date().toISOString(),
-        weight: formattedWeight,
-        temperature: formattedTemp,
-        oxygenSaturation: formattedSpO2,
-        bloodPressure: formattedBp,
       };
 
       if (isEmergency) {
@@ -209,132 +185,36 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
             </div>
           </div>
 
-          {timingOptions.length > 1 && (
-            <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+          {timingOptions.length > 0 && (
+            <fieldset>
+              <legend className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                 Appointment timing <span className="text-rose-400">*</span>
-              </label>
-              <select
-                required
-                value={appointmentSlot}
-                onChange={(e) => setAppointmentSlot(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
-              >
-                <option value="">Select timing</option>
-                {timingOptions.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
-              </select>
-            </div>
+              </legend>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {timingOptions.map((slot, index) => {
+                  const isSelected = appointmentSlot === slot;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setAppointmentSlot(slot)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? 'border-teal-400 bg-teal-500/15 text-teal-200 ring-1 ring-teal-400/60'
+                          : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-teal-500/50 hover:bg-slate-900'
+                      }`}
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Timing {index + 1}
+                      </span>
+                      <span className="mt-1 block text-sm font-bold">{slot}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
           )}
-
-          {/* Optional Vitals Section (Weight, Temperature, Blood Pressure) */}
-          {!isBasicPlan && <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-teal-400" />
-                Patient Vitals (Optional)
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">Reception Pre-Check</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {/* Weight with predefined kg */}
-              <div>
-                <label className="text-[11px] text-slate-400 font-medium block mb-1 flex items-center gap-1">
-                  <Scale className="w-3 h-3 text-teal-400" />
-                  Weight
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="68"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-3 pr-10 text-xs text-white placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
-                  />
-                  <span className="absolute right-3 text-xs font-bold text-teal-400 select-none pointer-events-none">
-                    kg
-                  </span>
-                </div>
-              </div>
-
-              {/* Temperature with predefined °F */}
-              <div>
-                <label className="text-[11px] text-slate-400 font-medium block mb-1 flex items-center gap-1">
-                  <Thermometer className="w-3 h-3 text-amber-400" />
-                  Temperature
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="98.6"
-                    value={temperature}
-                    onChange={(e) => setTemperature(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-3 pr-10 text-xs text-white placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
-                  />
-                  <span className="absolute right-3 text-xs font-bold text-amber-400 select-none pointer-events-none">
-                    °F
-                  </span>
-                </div>
-              </div>
-
-              {/* Oxygen Saturation */}
-              <div>
-                <label className="text-[11px] text-slate-400 font-medium block mb-1 flex items-center gap-1">
-                  <Activity className="w-3 h-3 text-cyan-400" />
-                  SpO₂
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="98"
-                    value={oxygenSaturation}
-                    onChange={(e) => setOxygenSaturation(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-3 pr-10 text-xs text-white placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
-                  />
-                  <span className="absolute right-3 text-xs font-bold text-cyan-400 select-none pointer-events-none">
-                    %
-                  </span>
-                </div>
-              </div>
-
-              {/* Blood Pressure with 2 columns and / in between */}
-              <div>
-                <label className="text-[11px] text-slate-400 font-medium block mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Activity className="w-3 h-3 text-rose-400" />
-                    Blood Pressure
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-mono">mmHg</span>
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      placeholder="120"
-                      value={bpSystolic}
-                      onChange={(e) => setBpSystolic(e.target.value)}
-                      title="Systolic (SYS)"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white text-center placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
-                    />
-                  </div>
-                  <span className="text-slate-500 font-black text-sm select-none">/</span>
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      placeholder="80"
-                      value={bpDiastolic}
-                      onChange={(e) => setBpDiastolic(e.target.value)}
-                      title="Diastolic (DIA)"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white text-center placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>}
 
           <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-3 flex items-center justify-between">
             <div className="flex items-center space-x-2">
