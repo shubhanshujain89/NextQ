@@ -50,9 +50,14 @@ export function ClinicQueueApp({ userId, role, clinicId: selectedClinicId, onLog
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
 
   const handleTokenUpdated = (updatedToken: QueueTokenUpdate) => {
-    setTokens((currentTokens) => currentTokens.map((token) => (
-      token.id === updatedToken.id ? { ...token, ...updatedToken } : token
-    )));
+    setTokens((currentTokens) => {
+      if (updatedToken.status === 'CANCELLED' || updatedToken.status === 'NO_SHOW') {
+        return currentTokens.filter((token) => token.id !== updatedToken.id);
+      }
+      return currentTokens.map((token) => (
+        token.id === updatedToken.id ? { ...token, ...updatedToken } : token
+      ));
+    });
   };
 
   useEffect(() => {
@@ -258,6 +263,7 @@ export function ClinicQueueApp({ userId, role, clinicId: selectedClinicId, onLog
               currentUser={currentUser}
               onGoogleSignIn={handleGoogleSignIn}
               onClinicUpdated={(nextClinic) => setClinic(nextClinic)}
+              onTokenUpdated={handleTokenUpdated}
             />
           )}
 

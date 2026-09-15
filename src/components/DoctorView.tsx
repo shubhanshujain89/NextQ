@@ -40,6 +40,7 @@ interface DoctorViewProps {
   currentUser: User | null;
   onGoogleSignIn: () => void;
   onClinicUpdated?: (clinic: Clinic) => void;
+  onTokenUpdated?: (token: Pick<TokenItem, 'id'> & Partial<TokenItem>) => void;
 }
 
 export const DoctorView: React.FC<DoctorViewProps> = ({
@@ -49,6 +50,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   currentUser,
   onGoogleSignIn,
   onClinicUpdated,
+  onTokenUpdated,
 }) => {
   const isBasicPlan = String(clinic.featurePlan || '').toUpperCase() === 'BASIC';
   const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -98,6 +100,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Unable to delete consultation.');
+      onTokenUpdated?.({ id: token.id, status: 'CANCELLED' });
       showToast(`Deleted consultation for ${token.patientName}.`);
     } catch (error) {
       console.error('Error deleting consultation:', error);

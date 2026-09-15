@@ -188,6 +188,7 @@ export class TokenRepository extends BaseRepository<Token> {
        AND a.doctor_id = t.doctor_id
        AND a.token_number = t.token_number
       WHERE t.doctor_id = ? AND t.session_id = ?
+        AND t.status NOT IN ('CANCELLED', 'NO_SHOW')
       ORDER BY t.sequence_number ASC
     `;
     return this.query(sql, [doctorId, sessionId]);
