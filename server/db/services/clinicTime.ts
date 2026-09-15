@@ -106,3 +106,13 @@ export const getClinicDateTimeUtc = (dateValue: string | undefined, slotValue: s
   const offsetMs = localAsUtc - naiveUtc;
   return new Date(naiveUtc - offsetMs);
 };
+
+export const getSlotStartMinutes = (slotValue: string): number | null => {
+  const match = String(slotValue || '').trim().match(/^(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+  return match ? parseClockMinutes(match[1]) : null;
+};
+
+export const isClinicSlotStarted = (slotValue: string | undefined, now = new Date(), timezone = DEFAULT_CLINIC_TIMEZONE): boolean => {
+  const startMinutes = getSlotStartMinutes(String(slotValue || ''));
+  return startMinutes === null || getClinicLocalMinutes(now, timezone) >= startMinutes;
+};

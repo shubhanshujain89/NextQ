@@ -189,7 +189,7 @@ export class BookingService {
         `SELECT COALESCE(MAX(sequence_number), 0) as max_sequence
          FROM \`tokens\` t
          LEFT JOIN \`appointments\` a ON a.session_id = t.session_id AND a.doctor_id = t.doctor_id AND a.token_number = t.token_number
-         WHERE t.clinic_id = ? AND t.session_id = ? AND t.doctor_id = ? AND a.scheduled_slot = ?`,
+         WHERE t.clinic_id = ? AND t.session_id = ? AND t.doctor_id = ? AND t.scheduled_slot = ?`,
         [input.clinicId, session.id, input.doctorId, appointmentSlot]
       );
       const sequenceNumber = (seqResult as any[])[0]?.max_sequence + 1 || 1;
@@ -205,10 +205,10 @@ export class BookingService {
       // Create token
       await connection.execute(
         `INSERT INTO \`tokens\` 
-         (id, clinic_id, session_id, doctor_id, token_number, sequence_number, patient_id, patient_name, patient_phone, patient_age, token_type, status, is_vip, is_hold, priority, amount_paid, payment_mode, payment_method, payment_status, created_at, pre_consultation_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, clinic_id, session_id, doctor_id, token_number, sequence_number, scheduled_slot, patient_id, patient_name, patient_phone, patient_age, token_type, status, is_vip, is_hold, priority, amount_paid, payment_mode, payment_method, payment_status, created_at, pre_consultation_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber,
+          tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber, appointmentSlot || '',
           patientId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null,
           'ONLINE', 'WAITING', 0, 0, 10, Number(input.amountPaid || 0), input.paymentMode || 'PAY_AT_CLINIC', input.paymentMethod || 'PAY_AT_CLINIC', input.paymentStatus === 'PAID' ? 'PAID' : 'PENDING', now,
           input.reason?.trim() ? JSON.stringify({ symptoms: input.reason.trim() }) : null
@@ -306,8 +306,8 @@ export class BookingService {
       const [seqResult] = await connection.execute(
         `SELECT COALESCE(MAX(sequence_number), 0) as max_sequence
          FROM \`tokens\`
-         WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?`,
-        [input.clinicId, session.id, input.doctorId]
+         WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? AND scheduled_slot = ?`,
+        [input.clinicId, session.id, input.doctorId, appointmentSlot || '']
       );
       const sequenceNumber = (seqResult as any[])[0]?.max_sequence + 1 || 1;
       
@@ -322,10 +322,10 @@ export class BookingService {
 
       await connection.execute(
         `INSERT INTO \`tokens\` 
-         (id, clinic_id, session_id, doctor_id, token_number, sequence_number, patient_id, patient_name, patient_phone, patient_age, token_type, status, is_vip, is_hold, priority, amount_paid, payment_mode, payment_method, payment_status, created_at, pre_consultation_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, clinic_id, session_id, doctor_id, token_number, sequence_number, scheduled_slot, patient_id, patient_name, patient_phone, patient_age, token_type, status, is_vip, is_hold, priority, amount_paid, payment_mode, payment_method, payment_status, created_at, pre_consultation_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber,
+          tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber, appointmentSlot || '',
           patientId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null,
           input.tokenType, 'WAITING', 0, 0,
           input.tokenType === 'EMERGENCY' ? 1 : 10, Number(doctor.consultationFee || 0), 'PAY_AT_CLINIC', 'CASH', 'PAID', now,

@@ -385,14 +385,14 @@ export class QueueService {
     return executeTransaction(async (connection) => {
       const [tokenRows] = await connection.execute(
         `SELECT t.id, t.clinic_id, t.session_id, t.doctor_id, t.token_number,
-                t.status, t.patient_name
+          t.scheduled_slot, t.status, t.patient_name
          FROM \`tokens\` t
          JOIN \`sessions\` s ON s.id = t.session_id
          WHERE t.id = ? AND t.clinic_id = ? AND s.clinic_id = ? AND s.status = 'ACTIVE'
            AND NOT EXISTS (
              SELECT 1 FROM appointments a
              WHERE a.tracking_id = (SELECT p.tracking_id FROM patients p WHERE p.id = t.patient_id)
-               AND a.scheduled_time > CURRENT_TIMESTAMP
+                 AND a.scheduled_time > CURRENT_TIMESTAMP
            )
          FOR UPDATE`,
         [tokenId, clinicId, clinicId]
@@ -408,11 +408,12 @@ export class QueueService {
       );
 
       const [activeRows] = await connection.execute(
-        `SELECT id FROM \`tokens\`
+         `SELECT id FROM \`tokens\`
          WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?
+           AND scheduled_slot = ?
            AND status IN ('CALLED', 'IN_CONSULTATION', 'SERVING')
          LIMIT 1`,
-        [clinicId, token.session_id, token.doctor_id]
+        [clinicId, token.session_id, token.doctor_id, token.scheduled_slot || '']
       );
       if ((activeRows as any[]).length > 0) return null;
 

@@ -100,6 +100,7 @@ export class TokenRepository extends BaseRepository<Token> {
     if (entity.doctorId !== undefined) columns.doctor_id = entity.doctorId;
     if (entity.tokenNumber !== undefined) columns.token_number = entity.tokenNumber;
     if (entity.sequenceNumber !== undefined) columns.sequence_number = entity.sequenceNumber;
+    if (entity.scheduledSlot !== undefined) columns.scheduled_slot = entity.scheduledSlot;
     if (entity.patientId !== undefined) columns.patient_id = entity.patientId;
     if (entity.patientName !== undefined) columns.patient_name = entity.patientName;
     if (entity.patientPhone !== undefined) columns.patient_phone = entity.patientPhone;

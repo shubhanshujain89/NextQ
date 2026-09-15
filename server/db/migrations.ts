@@ -90,6 +90,34 @@ export async function runMigrations(): Promise<void> {
       if (!message.includes('Duplicate column') && !message.includes('already exists')) throw error;
     }
   };
+  const ensureTokenTiming = async () => {
+    try {
+      await executeQuery(`ALTER TABLE tokens ADD COLUMN scheduled_slot VARCHAR(100) NOT NULL DEFAULT '' AFTER sequence_number`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('Duplicate column') && !message.includes('already exists')) throw error;
+    }
+    await executeQuery(
+      `UPDATE tokens t
+       LEFT JOIN appointments a ON a.session_id = t.session_id
+         AND a.doctor_id = t.doctor_id
+         AND a.token_number = t.token_number
+       SET t.scheduled_slot = COALESCE(a.scheduled_slot, '')
+       WHERE t.scheduled_slot = ''`
+    );
+    try {
+      await executeQuery(`ALTER TABLE tokens DROP INDEX uk_tokens_clinic_session_doctor_seq`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('check that it exists') && !message.includes('cannot drop')) throw error;
+    }
+    try {
+      await executeQuery(`ALTER TABLE tokens ADD UNIQUE KEY uk_tokens_clinic_session_doctor_slot_seq (clinic_id, session_id, doctor_id, scheduled_slot, sequence_number)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('Duplicate key name') && !message.includes('already exists')) throw error;
+    }
+  };
   const backfillAppointmentTimes = async () => {
     const appointments = await executeQuery<{
       id: string;
@@ -239,6 +267,7 @@ export async function runMigrations(): Promise<void> {
   await ensureSubscriptionColumns();
   await ensureClinicTimezone();
   await ensureAppointmentSlot();
+  await ensureTokenTiming();
   await backfillAppointmentTimes();
   await migrateQrInventory();
   await ensureQrCodeConstraints();

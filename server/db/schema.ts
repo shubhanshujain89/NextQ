@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     doctor_id VARCHAR(64) NOT NULL,
     token_number VARCHAR(50) NOT NULL,
     sequence_number INT NOT NULL,
+    scheduled_slot VARCHAR(100) NOT NULL DEFAULT '',
     patient_id VARCHAR(64),
     patient_name VARCHAR(255) NOT NULL,
     patient_phone VARCHAR(50) NOT NULL,
@@ -225,7 +226,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     INDEX idx_tokens_status (status),
     INDEX idx_tokens_sequence_number (sequence_number),
     INDEX idx_tokens_patient_id (patient_id),
-    UNIQUE KEY uk_tokens_clinic_session_doctor_seq (clinic_id, session_id, doctor_id, sequence_number)
+    UNIQUE KEY uk_tokens_clinic_session_doctor_slot_seq (clinic_id, session_id, doctor_id, scheduled_slot, sequence_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Queue Events table

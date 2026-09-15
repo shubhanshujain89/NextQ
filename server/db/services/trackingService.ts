@@ -5,7 +5,7 @@
 
 import { repositories } from '../repositories/index.js';
 import { executeQuery, executeQueryOne } from '../connection.js';
-import { getClinicBusinessDate } from './clinicTime.js';
+import { getClinicBusinessDate, isClinicSlotStarted } from './clinicTime.js';
 import { getPublicTrackingEstimatedWaitMinutes, QueueService } from './queueService.js';
 
 export interface TrackingResult {
@@ -85,27 +85,27 @@ export class TrackingService {
     const aheadResult = await executeQueryOne<{ count: number }>(
       `SELECT COUNT(*) AS count FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-       AND status = 'WAITING' AND sequence_number < ?`,
-      [result.clinic_id, result.session_id, result.doctor_id, result.sequence_number]
+      AND scheduled_slot = ? AND status = 'WAITING' AND sequence_number < ?`,
+          [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '', result.sequence_number]
     );
     const patientsAhead = Number(aheadResult?.count || 0);
 
     const servingResult = await executeQueryOne<{ token_number: string }>(
       `SELECT token_number FROM tokens
-       WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?
+       WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? AND scheduled_slot = ?
          AND status IN ('CALLED', 'IN_CONSULTATION', 'SERVING')
        ORDER BY called_at ASC, sequence_number ASC
        LIMIT 1`,
-      [result.clinic_id, result.session_id, result.doctor_id]
+      [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '']
     );
 
     // Get average consultation duration from recent completed tokens
     const completedResult = await executeQuery<{ consultation_duration_seconds: number }>(
       `SELECT consultation_duration_seconds FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-       AND status = ? AND consultation_duration_seconds > 0 
-       ORDER BY completed_at DESC LIMIT 10`,
-      [result.clinic_id, result.session_id, result.doctor_id, 'COMPLETED']
+        AND scheduled_slot = ? AND status = ? AND consultation_duration_seconds > 0
+        ORDER BY completed_at DESC LIMIT 5`,
+            [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '', 'COMPLETED']
     );
     
     const durations = completedResult
@@ -114,7 +114,7 @@ export class TrackingService {
     
     const averageMinutes = durations.length 
       ? durations.reduce((sum, value) => sum + value, 0) / durations.length 
-      : Number(result.avg_consultation_minutes) || 10;
+      : 5;
 
     // Calculate elapsed time for currently serving patient
     const activeStates = ['CALLED', 'IN_CONSULTATION', 'SERVING'];
@@ -131,8 +131,10 @@ export class TrackingService {
       currentRemaining + (patientsAhead * averageMinutes) + (Number(result.delay_minutes) || 0)
     ));
 
+    const slotStarted = isClinicSlotStarted(result.appointment_slot, new Date(), result.timezone);
+    const effectiveDoctorStatus = slotStarted ? result.doctor_status : 'OUT';
     const estimatedWaitMinutes = getPublicTrackingEstimatedWaitMinutes({
-      doctorStatus: result.doctor_status,
+      doctorStatus: effectiveDoctorStatus,
       status: result.status,
       operatingHours: result.operating_hours,
       queueWaitMinutes: rawEstimatedWaitMinutes,
@@ -172,7 +174,7 @@ export class TrackingService {
       estimatedWaitMinutes,
       estimatedConsultationTime,
       estimatedConsultationMinutes: Math.max(1, Math.round(averageMinutes)),
-      doctorStatus: result.doctor_status,
+      doctorStatus: effectiveDoctorStatus,
       delayMinutes: Number(result.delay_minutes) || 0,
       appointmentSlot: result.appointment_slot || undefined,
       appointmentDate,
