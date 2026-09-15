@@ -27,7 +27,10 @@ export interface TrackingResult {
 export const calculatePatientsAhead = (
   tokens: Array<{ sequenceNumber: number; status: string }>,
   currentSequenceNumber: number,
-): number => tokens.filter((token) => token.status === 'WAITING' && token.sequenceNumber < currentSequenceNumber).length;
+): number => tokens.filter((token) => (
+  ['WAITING', 'CALLED', 'IN_CONSULTATION', 'SERVING'].includes(token.status)
+  && token.sequenceNumber < currentSequenceNumber
+)).length;
 
 export const isValidTrackingId = (trackingId: string): boolean => /^(?=.*[A-Za-z_-])[A-Za-z0-9_-]{8,128}$/.test(String(trackingId || '').trim());
 
@@ -81,11 +84,12 @@ export class TrackingService {
 
     await new QueueService().syncDoctorStatusForEmptyQueue(result.clinic_id, result.doctor_id, new Date());
 
-    // Calculate patients ahead (waiting tokens with lower sequence number)
+    // Include waiting and active patients ahead in the same appointment timing.
     const aheadResult = await executeQueryOne<{ count: number }>(
       `SELECT COUNT(*) AS count FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-      AND scheduled_slot = ? AND status = 'WAITING' AND sequence_number < ?`,
+      AND scheduled_slot = ? AND status IN ('WAITING', 'CALLED', 'IN_CONSULTATION', 'SERVING')
+      AND sequence_number < ?`,
           [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '', result.sequence_number]
     );
     const patientsAhead = Number(aheadResult?.count || 0);
@@ -141,11 +145,14 @@ export class TrackingService {
       now: new Date(),
       timezone: result.timezone,
     });
-    const queueEstimatedTime = new Date(Date.now() + estimatedWaitMinutes * 60 * 1000);
     const scheduledTime = result.scheduled_time ? new Date(result.scheduled_time) : null;
-    const estimatedTime = scheduledTime && Number.isFinite(scheduledTime.getTime())
-      ? new Date(Math.max(queueEstimatedTime.getTime(), scheduledTime.getTime()))
-      : queueEstimatedTime;
+    const slotStart = scheduledTime && Number.isFinite(scheduledTime.getTime()) ? scheduledTime : null;
+    const queueEstimatedTime = new Date(Date.now() + estimatedWaitMinutes * 60 * 1000);
+    const estimatedTime = !slotStarted && slotStart
+      ? new Date(slotStart.getTime() + rawEstimatedWaitMinutes * 60 * 1000)
+      : slotStart
+        ? new Date(Math.max(queueEstimatedTime.getTime(), slotStart.getTime()))
+        : queueEstimatedTime;
     const estimatedConsultationTime = new Intl.DateTimeFormat('en-IN', {
       timeZone: result.timezone || 'Asia/Kolkata',
       hour: 'numeric',
