@@ -26,7 +26,11 @@ export class QueueEventRepository extends BaseRepository<QueueEvent> {
       tokenId: row.token_id,
       patientId: row.patient_id,
       eventType: row.event_type,
-      details: row.details ? JSON.parse(row.details) : undefined,
+      details: row.details == null
+        ? undefined
+        : typeof row.details === 'string'
+          ? JSON.parse(row.details)
+          : row.details,
       createdAt: new Date(row.created_at),
     };
   }
