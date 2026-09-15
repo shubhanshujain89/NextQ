@@ -1233,7 +1233,7 @@ app.post('/api/barcodes', async (req, res) => {
       code: barcodeValue,
       label,
       notes: String(req.body?.notes || '').trim(),
-      status: 'AVAILABLE',
+      status: 'DISABLED',
       clinicId: null,
       doctorId: null,
       assignedAt: null,
