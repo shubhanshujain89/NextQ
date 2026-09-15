@@ -49,7 +49,6 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [selectedScheduledSlot, setSelectedScheduledSlot] = useState('ALL');
 
   // Vitals & Triage Note editing state
   const [vitalsToken, setVitalsToken] = useState<TokenItem | null>(null);
@@ -149,8 +148,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const timingOptions = Array.from(new Set(tokens.map((token) => token.scheduledSlot).filter(Boolean))) as string[];
-  const scopedTokens = selectedScheduledSlot === 'ALL' ? tokens : tokens.filter((token) => token.scheduledSlot === selectedScheduledSlot);
+  const scopedTokens = tokens;
   const activeToken = scopedTokens.find(t => (
     t.status === 'CALLED' || t.status === 'SERVING' || t.status === 'IN_CONSULTATION'
   ));
@@ -411,17 +409,6 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto pb-10">
-      {timingOptions.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
-          <span className="mr-1 text-xs font-bold uppercase tracking-wider text-slate-400">Timing</span>
-          {['ALL', ...timingOptions].map((slot) => (
-            <button key={slot} type="button" onClick={() => setSelectedScheduledSlot(slot)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${selectedScheduledSlot === slot ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
-              {slot === 'ALL' ? 'All timings' : slot}
-            </button>
-          ))}
-        </div>
-      )}
-      
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-teal-500 text-slate-950 font-semibold px-3 py-2.5 rounded-lg shadow-xl flex items-center gap-2 border border-teal-400">
