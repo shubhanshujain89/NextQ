@@ -57,6 +57,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPatientListOpen, setIsPatientListOpen] = useState(false);
+  const [patientListTiming, setPatientListTiming] = useState('ALL');
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedScheduledSlot, setSelectedScheduledSlot] = useState('ALL');
@@ -250,6 +251,10 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   const averageWaitMinutes = averageWaitSummary.averageWaitMinutes;
 
   const currentPatients = scopedTokens.filter(t => t.status !== 'CANCELLED' && t.status !== 'NO_SHOW');
+  const patientListPatients = tokens.filter(t => (
+    t.status !== 'CANCELLED' && t.status !== 'NO_SHOW' &&
+    (patientListTiming === 'ALL' || t.scheduledSlot === patientListTiming)
+  ));
   const totalPatientsToday = currentPatients.length;
   const tokenRevenue = scopedTokens.reduce((total, token) => (
     token.paymentStatus === 'PAID' && token.status !== 'CANCELLED' && token.status !== 'NO_SHOW'
@@ -463,7 +468,10 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
         {/* Metric 1: Total Patients Today */}
         <button
           type="button"
-          onClick={() => setIsPatientListOpen(true)}
+          onClick={() => {
+            setPatientListTiming(selectedScheduledSlot);
+            setIsPatientListOpen(true);
+          }}
           className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 text-left shadow-lg transition hover:border-blue-400/40 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
           title="View all patient details"
         >
@@ -733,7 +741,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-300">Today&apos;s queue</p>
                 <h2 className="mt-1 text-xl font-bold text-white sm:text-2xl">All patient details</h2>
-                <p className="mt-1 text-xs text-slate-400">{currentPatients.length} patient{currentPatients.length === 1 ? '' : 's'} in this timing view</p>
+                <p className="mt-1 text-xs text-slate-400">{patientListPatients.length} patient{patientListPatients.length === 1 ? '' : 's'} in this timing view</p>
               </div>
               <button
                 type="button"
@@ -745,8 +753,25 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
               </button>
             </div>
 
+            <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-800 bg-slate-950/80 px-4 py-3 sm:px-6">
+              {['ALL', ...timingOptions].map((slot) => {
+                const count = patientCountForTiming(slot);
+                const isSelected = patientListTiming === slot;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setPatientListTiming(slot)}
+                    className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${isSelected ? 'border-blue-300 bg-blue-500 text-white shadow-lg shadow-blue-950/40' : 'border-slate-700 bg-slate-800 text-slate-200 hover:border-blue-400/60 hover:bg-slate-700'}`}
+                  >
+                    {slot === 'ALL' ? 'All timings' : slot} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
-              {currentPatients.length > 0 ? currentPatients.map((token) => {
+              {patientListPatients.length > 0 ? patientListPatients.map((token) => {
                 const canDelete = token.status === 'WAITING' || token.status === 'HOLD';
                 return (
                   <div key={token.id} className="mb-3 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 transition hover:border-slate-700 hover:bg-slate-950 sm:flex-row sm:items-center sm:justify-between">
@@ -763,7 +788,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
                         {token.patientAge ? <span>{token.patientAge} years</span> : null}
                         {token.patientGender ? <span>{token.patientGender}</span> : null}
                       </div>
-                      {token.scheduledSlot && <span className="mt-2 inline-flex rounded-full border border-blue-400/20 bg-blue-400/10 px-2.5 py-1 text-[10px] font-semibold text-blue-200">{token.scheduledSlot}</span>}
+                      {token.scheduledSlot && <span className="mt-2 inline-flex rounded-full border border-sky-300/60 bg-sky-500/20 px-2.5 py-1 text-[10px] font-bold text-sky-100 shadow-sm shadow-sky-950/30">{token.scheduledSlot}</span>}
                     </div>
                     {canDelete && (
                       <button
