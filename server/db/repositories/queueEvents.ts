@@ -3,6 +3,8 @@
  * Handles all queue event logging operations
  */
 
+import crypto from 'crypto';
+import type mysql from 'mysql2/promise';
 import { BaseRepository } from './base.js';
 
 export interface QueueEvent {
@@ -53,6 +55,31 @@ export class QueueEventRepository extends BaseRepository<QueueEvent> {
    */
   async logEvent(data: Omit<QueueEvent, 'id' | 'createdAt'>): Promise<QueueEvent> {
     return this.create(data as any);
+  }
+
+  async logEventInTransaction(
+    connection: mysql.PoolConnection,
+    data: Omit<QueueEvent, 'id' | 'createdAt'>,
+  ): Promise<QueueEvent> {
+    const id = crypto.randomUUID();
+    await connection.execute(
+      `INSERT INTO \`queue_events\` (\`id\`, \`clinic_id\`, \`token_id\`, \`patient_id\`, \`event_type\`, \`details\`)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.clinicId,
+        data.tokenId ?? null,
+        data.patientId ?? null,
+        data.eventType,
+        data.details == null ? null : JSON.stringify(data.details),
+      ],
+    );
+
+    return {
+      ...data,
+      id,
+      createdAt: new Date(),
+    };
   }
 
   /**

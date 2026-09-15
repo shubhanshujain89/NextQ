@@ -630,7 +630,7 @@ export class QueueService {
       );
 
       try {
-        await repositories.queueEvents.logEvent({
+        await repositories.queueEvents.logEventInTransaction(connection, {
           clinicId,
           tokenId: token.id,
           eventType: 'TOKEN_CANCELLED',
