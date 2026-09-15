@@ -602,7 +602,7 @@ export class QueueService {
         `SELECT t.id, t.token_number, t.patient_name, t.doctor_id, t.status, t.session_id
          FROM \`tokens\` t
          JOIN \`sessions\` s ON s.id = t.session_id
-         WHERE t.id = ? AND t.clinic_id = ? AND s.clinic_id = ? AND s.status = 'ACTIVE'
+         WHERE t.id = ? AND t.clinic_id = ? AND s.clinic_id = ?
          FOR UPDATE`,
         [tokenId, clinicId, clinicId]
       );
@@ -620,6 +620,13 @@ export class QueueService {
         [tokenId, clinicId, token.session_id]
       );
       if ((updateResult as any).affectedRows !== 1) return null;
+
+      await connection.execute(
+        `UPDATE \`appointments\`
+         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+         WHERE session_id = ? AND token_number = ? AND clinic_id = ?`,
+        [token.session_id, token.token_number, clinicId]
+      );
 
       await repositories.queueEvents.logEvent({
         clinicId,

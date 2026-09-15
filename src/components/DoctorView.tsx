@@ -99,7 +99,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
       showToast(`Deleted consultation for ${token.patientName}.`);
     } catch (error) {
       console.error('Error deleting consultation:', error);
-      showToast('Unable to delete consultation. Please retry.');
+      showToast(error instanceof Error ? error.message : 'Unable to delete consultation. Please retry.');
     } finally {
       setIsDeletingPatient(false);
     }
