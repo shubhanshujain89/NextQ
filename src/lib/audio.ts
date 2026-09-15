@@ -104,14 +104,16 @@ class SoundManager {
     }
   }
 
-  announceToken(tokenNumber: string, patientName?: string, cabin: string = 'Cabin 1'): void {
+  announceToken(tokenNumber: string, patientName?: string, cabin?: string): void {
     this.playChime();
     setTimeout(() => {
       let announcement = `Token Number ${tokenNumber.split('').join(' ')}. `;
       if (patientName) {
         announcement += `${patientName}. `;
       }
-      announcement += `Please proceed to ${cabin}.`;
+      announcement += cabin?.trim()
+        ? `Please proceed to ${cabin.trim()}.`
+        : 'Please proceed.';
       this.speak(announcement);
     }, 400);
   }
