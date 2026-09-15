@@ -54,6 +54,25 @@ test('average wait is hidden until the doctor is checked in', () => {
   assert.equal(summary.suffix, '');
 });
 
+test('average wait uses the rolling consultation average per waiting patient', () => {
+  const summary = getAverageWaitSummary('IN', [
+    { id: '1' },
+    { id: '2' },
+    { id: '3' },
+  ] as any, 7.5);
+
+  assert.equal(summary.averageWaitMinutes, 22.5);
+});
+
+test('average wait falls back to five minutes per waiting patient', () => {
+  const summary = getAverageWaitSummary('IN', [
+    { id: '1' },
+    { id: '2' },
+  ] as any, 0);
+
+  assert.equal(summary.averageWaitMinutes, 10);
+});
+
 test('direct booking links resolve straight to the appointment details step', () => {
   const result = resolveLinkedBookingSelection('demo-clinic-1', 'demo-doctor-1', [
     {

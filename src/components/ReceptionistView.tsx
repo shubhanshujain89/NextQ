@@ -163,7 +163,7 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
   });
   const holdTokens = scopedTokens.filter(t => t.status === 'HOLD');
   const completedTokens = scopedTokens.filter(t => t.status === 'COMPLETED');
-  const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens);
+  const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens, clinic.avgConsultationMinutes);
   const averageWaitMinutes = averageWaitSummary.averageWaitMinutes;
 
   // Filter list

@@ -394,7 +394,7 @@ export class TokenRepository extends BaseRepository<Token> {
   /**
    * Get average consultation duration for completed tokens
    */
-  async getAverageConsultationDuration(doctorId: string, sessionId: string, limit: number = 10): Promise<number> {
+  async getAverageConsultationDuration(doctorId: string, sessionId: string, limit: number = 5): Promise<number> {
     const sql = `
       SELECT consultation_duration_seconds
       FROM \`tokens\`
@@ -406,7 +406,7 @@ export class TokenRepository extends BaseRepository<Token> {
     const rows = await executeQuery<{ consultation_duration_seconds: number }>(sql, [doctorId, sessionId, limit]);
     const durations = rows.map(r => r.consultation_duration_seconds / 60).filter(d => d > 0);
     
-    if (durations.length === 0) return 10; // Default 10 minutes
+    if (durations.length === 0) return 5; // Default 5 minutes per waiting patient
     
     return durations.reduce((sum, d) => sum + d, 0) / durations.length;
   }

@@ -237,7 +237,7 @@ export const DoctorView: React.FC<DoctorViewProps> = ({
   const completedTokens = scopedTokens.filter(t => t.status === 'COMPLETED');
   const holdTokens = scopedTokens.filter(t => t.status === 'HOLD');
 
-  const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens);
+  const averageWaitSummary = getAverageWaitSummary(clinic.doctorStatus, waitingTokens, clinic.avgConsultationMinutes);
   const averageWaitMinutes = averageWaitSummary.averageWaitMinutes;
 
   const currentPatients = scopedTokens.filter(t => t.status !== 'CANCELLED' && t.status !== 'NO_SHOW');

@@ -7,6 +7,7 @@ export interface AverageWaitSummary {
 export function getAverageWaitSummary(
   doctorStatus: string | undefined,
   waitingTokens: Array<{ createdAt?: string | null }>,
+  averageConsultationMinutes?: number,
 ): AverageWaitSummary {
   if (doctorStatus !== 'IN') {
     return {
@@ -24,11 +25,11 @@ export function getAverageWaitSummary(
     };
   }
 
-  const averageWaitMinutes = Number((waitingTokens.reduce((sum, token) => {
-    const tokenCreatedAt = token.createdAt ? new Date(token.createdAt).getTime() : Date.now();
-    const elapsedMinutes = Math.max(0, (Date.now() - tokenCreatedAt) / 60000);
-    return sum + elapsedMinutes;
-  }, 0) / waitingTokens.length).toFixed(1));
+  const consultationMinutes = Number(averageConsultationMinutes);
+  const minutesPerPatient = Number.isFinite(consultationMinutes) && consultationMinutes > 0
+    ? consultationMinutes
+    : 5;
+  const averageWaitMinutes = Number((waitingTokens.length * minutesPerPatient).toFixed(1));
 
   return {
     averageWaitMinutes,
