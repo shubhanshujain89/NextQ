@@ -482,6 +482,7 @@ app.get('/api/staff/queue/:clinicId', async (req, res) => {
         doctorName: displayedDoctor?.name || clinic.doctorName || '',
         doctorPhoto: displayedDoctor?.photo || '',
         specialty: displayedDoctor?.specialization || clinic.specialty || '',
+        availableHours: displayedDoctor?.availableHours || '',
         cabinNumber: clinic.cabinNumber || '',
         doctorStatus: clinic.doctorStatus,
         delayMinutes: clinic.delayMinutes || 0,
@@ -875,7 +876,7 @@ app.post('/api/staff/queue/:clinicId/walk-in', async (req, res) => {
     }
     if (!await requireActivePlan(res, clinicId, context.role)) return;
 
-    const { doctorId, patientName, phone, age, reason, tokenType } = req.body || {};
+    const { doctorId, patientName, phone, age, reason, tokenType, appointmentSlot } = req.body || {};
     const normalizedPatientName = String(patientName || '').trim();
     const normalizedPhone = String(phone || '').trim();
     const normalizedAge = age === undefined || age === null || age === '' ? undefined : Number(age);
@@ -900,6 +901,7 @@ app.post('/api/staff/queue/:clinicId/walk-in', async (req, res) => {
       phone: normalizedPhone,
       age: normalizedAge,
       reason: undefined,
+      appointmentSlot: typeof appointmentSlot === 'string' ? appointmentSlot.trim() : undefined,
       tokenType: normalizedTokenType,
     });
     res.status(201).json(result);

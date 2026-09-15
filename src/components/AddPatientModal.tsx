@@ -30,6 +30,8 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
   const [patientGender, setPatientGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [isEmergency, setIsEmergency] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI' | 'CARD'>('CASH');
+  const timingOptions = String(clinic.availableHours || '').split(',').map((slot) => slot.trim()).filter(Boolean);
+  const [appointmentSlot, setAppointmentSlot] = useState(timingOptions.length === 1 ? timingOptions[0] : '');
   
   // Optional Vitals & Reception Notes (with predefined units)
   const [weight, setWeight] = useState('');
@@ -53,6 +55,9 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
       if (!clinic.doctorId) {
         throw new Error('No active doctor is configured for this clinic.');
       }
+      if (timingOptions.length > 1 && !appointmentSlot) {
+        throw new Error('Select an appointment timing.');
+      }
 
       const formattedWeight = !isBasicPlan && weight.trim() ? `${weight.trim()} kg` : undefined;
       const formattedTemp = !isBasicPlan && temperature.trim() ? `${temperature.trim()} °F` : undefined;
@@ -73,6 +78,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
           phone: patientPhone.trim(),
           age: Number(patientAge) || undefined,
           tokenType: isEmergency ? 'EMERGENCY' : 'WALK_IN',
+          appointmentSlot: appointmentSlot || undefined,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -90,6 +96,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
         patientAge: Number(patientAge) || 35,
         patientGender,
         tokenType: isEmergency ? 'EMERGENCY' : 'WALK_IN',
+        scheduledSlot: appointmentSlot || undefined,
         status: 'WAITING',
         isEmergency,
         isHold: false,
@@ -201,6 +208,23 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
               </select>
             </div>
           </div>
+
+          {timingOptions.length > 1 && (
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
+                Appointment timing <span className="text-rose-400">*</span>
+              </label>
+              <select
+                required
+                value={appointmentSlot}
+                onChange={(e) => setAppointmentSlot(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              >
+                <option value="">Select timing</option>
+                {timingOptions.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* Optional Vitals Section (Weight, Temperature, Blood Pressure) */}
           {!isBasicPlan && <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">

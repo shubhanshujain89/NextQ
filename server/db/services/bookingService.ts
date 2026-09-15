@@ -157,13 +157,22 @@ export class BookingService {
          WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '+', ''), '-', ''), '(', ''), ')', ''), 10) = ?
            AND p.clinic_id = ?
            AND t.clinic_id = ?
+           AND t.doctor_id = ?
            AND t.status NOT IN ('CANCELLED', 'NO_SHOW')
+           AND EXISTS (
+             SELECT 1
+             FROM \`appointments\` existing_a
+             WHERE existing_a.session_id = t.session_id
+               AND existing_a.doctor_id = t.doctor_id
+               AND existing_a.token_number = t.token_number
+               AND existing_a.scheduled_slot = ?
+           )
            AND s.date = ?
          LIMIT 1`,
-        [normalizedPhone, input.clinicId, input.clinicId, businessDate]
+        [normalizedPhone, input.clinicId, input.clinicId, input.doctorId, appointmentSlot, businessDate]
       );
       if ((existingPatientRows as any[]).length > 0) {
-        throw new Error('A booking is already registered for this mobile number today.');
+        throw new Error('A booking is already registered for this mobile number and timing today.');
       }
 
       const session = await this.getOrCreateSession(connection, input.clinicId, businessDate);
@@ -254,6 +263,18 @@ export class BookingService {
 
     const today = new Date();
     const businessDate = getClinicBusinessDate(today, clinic.timezone);
+    const configuredSlots = String(doctor.availableHours || '')
+      .split(',')
+      .map((slot) => slot.trim())
+      .filter(Boolean);
+    const appointmentSlot = input.appointmentSlot?.trim()
+      || (configuredSlots.length === 1 ? configuredSlots[0] : '');
+    if (configuredSlots.length > 1 && !appointmentSlot) {
+      throw new Error('Select an appointment timing for this doctor.');
+    }
+    if (appointmentSlot && !configuredSlots.some((slot) => slot.toLowerCase() === appointmentSlot.toLowerCase())) {
+      throw new Error('Select a valid appointment timing.');
+    }
 
     return executeTransaction(async (connection) => {
       const session = await this.getOrCreateSession(connection, input.clinicId, businessDate);
@@ -261,6 +282,26 @@ export class BookingService {
       const patientId = crypto.randomUUID();
       const tokenId = crypto.randomUUID();
       const now = new Date();
+      const normalizedPhone = input.phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+      const [existingPatientRows] = await connection.execute(
+        `SELECT t.id
+         FROM \`tokens\` t
+         JOIN \`patients\` p ON p.id = t.patient_id
+         JOIN \`appointments\` a ON a.session_id = t.session_id
+           AND a.doctor_id = t.doctor_id
+           AND a.token_number = t.token_number
+         JOIN \`sessions\` existing_s ON existing_s.id = t.session_id
+         WHERE RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '+', ''), '-', ''), '(', ''), ')', ''), 10) = ?
+           AND t.clinic_id = ? AND t.doctor_id = ?
+           AND t.status NOT IN ('CANCELLED', 'NO_SHOW')
+           AND a.scheduled_slot = ? AND existing_s.date = ?
+         LIMIT 1`,
+        [normalizedPhone, input.clinicId, input.doctorId, appointmentSlot || null, businessDate]
+      );
+      if ((existingPatientRows as any[]).length > 0) {
+        throw new Error('A booking is already registered for this mobile number and timing today.');
+      }
+      const scheduledTime = getClinicDateTimeUtc(businessDate, appointmentSlot, clinic.timezone) || now;
       await connection.execute('SELECT id FROM `clinics` WHERE id = ? FOR UPDATE', [input.clinicId]);
       const [seqResult] = await connection.execute(
         `SELECT COALESCE(MAX(sequence_number), 0) as max_sequence
@@ -276,7 +317,7 @@ export class BookingService {
       await connection.execute(
         `INSERT INTO \`patients\` (id, clinic_id, tracking_id, name, phone, age, gender, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [patientId, input.clinicId, trackingId, input.patientName.trim(), input.phone.trim(), input.age || null, null, now, now]
+        [patientId, input.clinicId, trackingId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null, null, now, now]
       );
 
       await connection.execute(
@@ -285,7 +326,7 @@ export class BookingService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tokenId, input.clinicId, session.id, input.doctorId, tokenNumber, sequenceNumber,
-          patientId, input.patientName.trim(), input.phone.trim(), input.age || null,
+          patientId, input.patientName.trim(), `+91${normalizedPhone}`, input.age || null,
           input.tokenType, 'WAITING', 0, 0,
           input.tokenType === 'EMERGENCY' ? 1 : 10, Number(doctor.consultationFee || 0), 'PAY_AT_CLINIC', 'CASH', 'PAID', now,
           input.reason?.trim() ? JSON.stringify({ symptoms: input.reason.trim() }) : null
@@ -294,12 +335,12 @@ export class BookingService {
 
       await connection.execute(
         `INSERT INTO \`appointments\` 
-         (id, clinic_id, doctor_id, session_id, tracking_id, patient_name, patient_phone, patient_age, visit_reason, appointment_type, token_number, token_sequence, status, scheduled_time, estimated_time, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, clinic_id, doctor_id, session_id, tracking_id, patient_name, patient_phone, patient_age, visit_reason, appointment_type, token_number, token_sequence, scheduled_slot, status, scheduled_time, estimated_time, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(), input.clinicId, input.doctorId, session.id, trackingId,
           input.patientName.trim(), input.phone.trim(), input.age || null, input.reason?.trim() || null,
-          input.tokenType, tokenNumber, sequenceNumber, 'scheduled', now, now, now, now
+          input.tokenType, tokenNumber, sequenceNumber, appointmentSlot || null, 'scheduled', scheduledTime, scheduledTime, now, now
         ]
       );
 

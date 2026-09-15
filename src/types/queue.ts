@@ -90,6 +90,7 @@ export interface Clinic {
   doctorName?: string;
   doctorPhoto?: string;
   specialty?: string;
+  availableHours?: string;
   cabinNumber?: string;
   doctorStatus: DoctorStatus | 'ON_BREAK' | 'EMERGENCY';
   delayMinutes: number; // Broadcast delay in minutes

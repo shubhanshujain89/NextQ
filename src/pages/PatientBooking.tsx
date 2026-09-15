@@ -196,7 +196,7 @@ export const getEarliestBookingSchedule = (doctor: Pick<Doctor, 'availableDays' 
 };
 
 export const isDuplicateBookingError = (message: string = '') =>
-  /already registered for this mobile number today|already.*booked.*this.*mobile.*number|duplicate.*mobile.*number/i.test(message);
+  /already registered for this mobile number(?: and timing)? today|already.*booked.*this.*mobile.*number|duplicate.*mobile.*number/i.test(message);
 
 export const resolveLinkedBookingSelection = (
   linkedClinicId: string,
