@@ -629,12 +629,16 @@ export class QueueService {
         [token.session_id, token.token_number, clinicId]
       );
 
-      await repositories.queueEvents.logEvent({
-        clinicId,
-        tokenId: token.id,
-        eventType: 'TOKEN_CANCELLED',
-        details: { tokenNumber: token.token_number, reason: 'PATIENT_NOT_PRESENT' },
-      });
+      try {
+        await repositories.queueEvents.logEvent({
+          clinicId,
+          tokenId: token.id,
+          eventType: 'TOKEN_CANCELLED',
+          details: { tokenNumber: token.token_number, reason: 'PATIENT_NOT_PRESENT' },
+        });
+      } catch (error) {
+        console.error('Unable to record cancellation event:', error);
+      }
 
       return {
         id: token.id,
