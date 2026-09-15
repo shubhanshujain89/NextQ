@@ -75,7 +75,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
       if (!clinic.doctorId) {
         throw new Error('No active doctor is configured for this clinic.');
       }
-      if (timingOptions.length > 1 && !appointmentSlot) {
+      if (!appointmentSlot) {
         throw new Error('Select an appointment timing.');
       }
 
@@ -247,6 +247,12 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
             </fieldset>
           )}
 
+          {timingOptions.length === 0 && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              No appointment timings are configured for this doctor. Add a timing before issuing a patient token.
+            </div>
+          )}
+
           <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-3 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <ShieldAlert className="w-4 h-4 text-rose-400" />
@@ -315,7 +321,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !appointmentSlot}
               className="flex-1 py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-teal-500/20"
             >
               {isSubmitting ? 'Generating Slip...' : 'Issue Token Slip'}

@@ -269,7 +269,7 @@ export class BookingService {
       .filter(Boolean);
     const appointmentSlot = input.appointmentSlot?.trim()
       || (configuredSlots.length === 1 ? configuredSlots[0] : '');
-    if (configuredSlots.length > 1 && !appointmentSlot) {
+    if (!appointmentSlot) {
       throw new Error('Select an appointment timing for this doctor.');
     }
     if (appointmentSlot && !configuredSlots.some((slot) => slot.toLowerCase() === appointmentSlot.toLowerCase())) {
