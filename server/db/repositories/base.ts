@@ -93,6 +93,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   async create(entity: Omit<T, 'id' | 'created_at' | 'updated_at'> & { id?: string }): Promise<T> {
     const columns = this.mapEntityToColumns(entity as Partial<T>);
     const id = entity.id || crypto.randomUUID();
+    columns[this.primaryKey] = id;
     
     const columnNames = Object.keys(columns);
     const placeholders = columnNames.map(() => '?').join(', ');
