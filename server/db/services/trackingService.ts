@@ -116,8 +116,8 @@ export class TrackingService {
       .map(item => Number(item.consultation_duration_seconds) / 60)
       .filter(value => Number.isFinite(value) && value > 0);
     
-    const averageMinutes = durations.length 
-      ? durations.reduce((sum, value) => sum + value, 0) / durations.length 
+    const averageMinutes = durations.length
+      ? Math.max(1, durations.reduce((sum, value) => sum + value, 0) / durations.length)
       : 5;
 
     // Calculate elapsed time for currently serving patient
