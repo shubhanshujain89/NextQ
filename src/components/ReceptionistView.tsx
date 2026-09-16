@@ -202,6 +202,25 @@ export const ReceptionistView: React.FC<ReceptionistViewProps> = ({
     try {
       // Pick the next token by emergency/normal priority.
       const nextToken = waitingTokens[0];
+      if (activeToken) {
+        if (activeToken.status === 'CALLED') {
+          const startResponse = await fetch(`/api/staff/queue/${encodeURIComponent(activeToken.id)}/start`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          const startPayload = await startResponse.json().catch(() => ({}));
+          if (!startResponse.ok) throw new Error(startPayload.error || 'Unable to start consultation.');
+        }
+
+        const completeResponse = await fetch(`/api/staff/queue/${encodeURIComponent(activeToken.id)}/complete`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const completePayload = await completeResponse.json().catch(() => ({}));
+        if (!completeResponse.ok) throw new Error(completePayload.error || 'Unable to complete consultation.');
+        onTokenUpdated(completePayload);
+      }
+
       const response = await fetch(`/api/staff/queue/${encodeURIComponent(nextToken.id)}/call`, {
         method: 'POST',
         credentials: 'include',
