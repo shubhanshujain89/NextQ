@@ -97,7 +97,7 @@ export class TrackingService {
     const servingResult = await executeQueryOne<{ token_number: string }>(
       `SELECT token_number FROM tokens
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? AND scheduled_slot = ?
-         AND status IN ('IN_CONSULTATION', 'SERVING')
+         AND status IN ('CALLED', 'IN_CONSULTATION', 'SERVING')
        ORDER BY called_at ASC, sequence_number ASC
        LIMIT 1`,
       [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '']
@@ -105,11 +105,13 @@ export class TrackingService {
 
     // Get average consultation duration from recent completed tokens
     const completedResult = await executeQuery<{ consultation_duration_seconds: number }>(
-      `SELECT consultation_duration_seconds FROM tokens 
-       WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-        AND status = ? AND consultation_duration_seconds > 0
-        ORDER BY completed_at DESC LIMIT 5`,
-          [result.clinic_id, result.session_id, result.doctor_id, 'COMPLETED']
+      `SELECT consultation_duration_seconds FROM (
+         SELECT consultation_duration_seconds FROM tokens
+         WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?
+           AND status = ? AND consultation_duration_seconds > 0
+         ORDER BY completed_at DESC LIMIT 5
+       ) AS recent_consultations`,
+      [result.clinic_id, result.session_id, result.doctor_id, 'COMPLETED']
     );
     
     const durations = completedResult
