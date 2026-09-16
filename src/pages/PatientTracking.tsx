@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const getTrackingMobileFromQuery = () => {
   const params = new URLSearchParams(window.location.search);
@@ -37,6 +37,7 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
   const [trackingError, setTrackingError] = useState('');
   const [mobile, setMobile] = useState(getTrackingMobileFromQuery());
   const [isSearching, setIsSearching] = useState(false);
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     if (!mobile.trim()) return;
@@ -47,7 +48,7 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
     if (!tracking) return;
     const interval = window.setInterval(() => {
       void findBooking();
-    }, 30000);
+    }, 5000);
     return () => window.clearInterval(interval);
   }, [tracking]);
 
@@ -55,6 +56,7 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
     event?.preventDefault();
     const normalizedMobile = mobile.trim();
     if (!normalizedMobile) return;
+    const requestId = ++requestSequence.current;
     setIsSearching(true);
     setTrackingError('');
     if (!/^\d{10}$/.test(normalizedMobile.replace(/\D/g, ''))) {
@@ -72,14 +74,16 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'No booking found for this mobile number today.');
-      setTracking(data as TrackingData);
+      if (requestId === requestSequence.current) setTracking(data as TrackingData);
     } catch (error) {
-      setTracking(null);
-      setTrackingError(error instanceof Error && error.message
-        ? error.message
-        : 'Connection temporarily unavailable.');
+      if (requestId === requestSequence.current) {
+        setTracking(null);
+        setTrackingError(error instanceof Error && error.message
+          ? error.message
+          : 'Connection temporarily unavailable.');
+      }
     } finally {
-      setIsSearching(false);
+      if (requestId === requestSequence.current) setIsSearching(false);
     }
   };
 
