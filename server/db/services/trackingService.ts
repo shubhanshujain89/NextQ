@@ -28,7 +28,7 @@ export const calculatePatientsAhead = (
   tokens: Array<{ sequenceNumber: number; status: string }>,
   currentSequenceNumber: number,
 ): number => tokens.filter((token) => (
-  ['WAITING', 'CALLED', 'IN_CONSULTATION', 'SERVING'].includes(token.status)
+  token.status === 'WAITING'
   && token.sequenceNumber < currentSequenceNumber
 )).length;
 
@@ -84,11 +84,11 @@ export class TrackingService {
 
     await new QueueService().syncDoctorStatusForEmptyQueue(result.clinic_id, result.doctor_id, new Date());
 
-    // Include waiting and active patients ahead in the same appointment timing.
+    // Position counts only waiting patients; an active consultation is shown separately.
     const aheadResult = await executeQueryOne<{ count: number }>(
       `SELECT COUNT(*) AS count FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-      AND scheduled_slot = ? AND status IN ('WAITING', 'CALLED', 'IN_CONSULTATION', 'SERVING')
+      AND scheduled_slot = ? AND status = 'WAITING'
       AND sequence_number < ?`,
           [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '', result.sequence_number]
     );
@@ -132,7 +132,7 @@ export class TrackingService {
       : 0;
 
     const rawEstimatedWaitMinutes = Math.max(0, Math.round(
-      currentRemaining + (patientsAhead * averageMinutes) + (Number(result.delay_minutes) || 0)
+      currentRemaining + (patientsAhead * averageMinutes) + (servingResult ? 0 : (Number(result.delay_minutes) || 0))
     ));
 
     const slotStarted = isClinicSlotStarted(result.appointment_slot, new Date(), result.timezone);
@@ -182,7 +182,7 @@ export class TrackingService {
       estimatedConsultationTime,
       estimatedConsultationMinutes: Math.max(1, Math.round(averageMinutes)),
       doctorStatus: effectiveDoctorStatus,
-      delayMinutes: Number(result.delay_minutes) || 0,
+      delayMinutes: servingResult ? 0 : (Number(result.delay_minutes) || 0),
       appointmentSlot: result.appointment_slot || undefined,
       appointmentDate,
       currentlyServingToken: servingResult?.token_number || undefined,

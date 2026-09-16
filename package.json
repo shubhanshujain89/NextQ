@@ -20,7 +20,8 @@
     "clean": "node -e \"const fs=require('fs');['dist','dist-server'].forEach((p)=>fs.existsSync(p)&&fs.rmSync(p,{recursive:true,force:true}))\"",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit",
     "db:migrate": "node ./node_modules/tsx/dist/cli.mjs server/db/migrations.ts migrate",
-    "db:reset": "node ./node_modules/tsx/dist/cli.mjs server/db/migrations.ts reset"
+    "db:reset": "node ./node_modules/tsx/dist/cli.mjs server/db/migrations.ts reset",
+    "db:seed-test-appointments": "node ./node_modules/tsx/dist/cli.mjs scripts/seed-test-appointments.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

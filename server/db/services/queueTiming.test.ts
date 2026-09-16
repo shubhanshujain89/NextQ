@@ -154,7 +154,7 @@ test('tracking position counts only earlier waiting tokens', () => {
     { sequenceNumber: 2, status: 'WAITING' },
     { sequenceNumber: 3, status: 'CALLED' },
     { sequenceNumber: 4, status: 'WAITING' },
-  ], 5), 3);
+  ], 5), 2);
   assert.equal(calculatePatientsAhead([
     { sequenceNumber: 1, status: 'WAITING' },
     { sequenceNumber: 2, status: 'WAITING' },
