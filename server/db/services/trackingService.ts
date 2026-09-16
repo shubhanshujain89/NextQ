@@ -97,7 +97,7 @@ export class TrackingService {
     const servingResult = await executeQueryOne<{ token_number: string }>(
       `SELECT token_number FROM tokens
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? AND scheduled_slot = ?
-         AND status IN ('CALLED', 'IN_CONSULTATION', 'SERVING')
+         AND status IN ('IN_CONSULTATION', 'SERVING')
        ORDER BY called_at ASC, sequence_number ASC
        LIMIT 1`,
       [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '']
@@ -121,7 +121,7 @@ export class TrackingService {
       : 5;
 
     // Calculate elapsed time for currently serving patient
-    const activeStates = ['CALLED', 'IN_CONSULTATION', 'SERVING'];
+    const activeStates = ['IN_CONSULTATION', 'SERVING'];
     const calledAt = result.called_at ? Date.parse(result.called_at) : NaN;
     const elapsedMinutes = Number.isFinite(calledAt) 
       ? Math.max(0, (Date.now() - calledAt) / 60000) 

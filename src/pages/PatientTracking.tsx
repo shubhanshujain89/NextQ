@@ -182,7 +182,7 @@ export const PatientTracking: React.FC<PatientTrackingProps> = ({ onBack }) => {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="min-h-[148px] rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,#ecfdf5_0%,#f8fffd_100%)] p-4 text-center shadow-inner shadow-emerald-100/60 transition hover:border-emerald-300">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Your position</p>
-                  <div className="mt-3 text-3xl font-black tracking-[-0.05em] text-slate-900">{isCompleted(tracking) ? 'Completed' : getQueuePosition(tracking) === 1 ? 'NEXT' : `#${getQueuePosition(tracking)}`}</div>
+                  <div className="mt-3 text-3xl font-black tracking-[-0.05em] text-slate-900">{isCompleted(tracking) ? 'Completed' : tracking.status === 'CALLED' ? 'YOUR TURN' : getQueuePosition(tracking) === 1 ? 'NEXT' : `#${getQueuePosition(tracking)}`}</div>
                   <p className="mt-1 text-sm text-slate-600">{isCompleted(tracking) ? 'Your consultation is complete.' : 'in the queue'}</p>
                 </div>
                 <div className="min-h-[148px] rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/40">
