@@ -116,7 +116,7 @@ export class TrackingService {
     
     const durations = completedResult
       .map(item => Number(item.consultation_duration_seconds) / 60)
-      .filter(value => Number.isFinite(value) && value > 0);
+      .filter(value => Number.isFinite(value) && value >= 0.5);
     
     const averageMinutes = durations.length
       ? durations.reduce((sum, value) => sum + value, 0) / durations.length
