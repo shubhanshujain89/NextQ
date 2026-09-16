@@ -107,9 +107,9 @@ export class TrackingService {
     const completedResult = await executeQuery<{ consultation_duration_seconds: number }>(
       `SELECT consultation_duration_seconds FROM tokens 
        WHERE clinic_id = ? AND session_id = ? AND doctor_id = ? 
-        AND scheduled_slot = ? AND status = ? AND consultation_duration_seconds > 0
+        AND status = ? AND consultation_duration_seconds > 0
         ORDER BY completed_at DESC LIMIT 5`,
-            [result.clinic_id, result.session_id, result.doctor_id, result.appointment_slot || '', 'COMPLETED']
+          [result.clinic_id, result.session_id, result.doctor_id, 'COMPLETED']
     );
     
     const durations = completedResult
@@ -117,7 +117,7 @@ export class TrackingService {
       .filter(value => Number.isFinite(value) && value > 0);
     
     const averageMinutes = durations.length
-      ? Math.max(1, durations.reduce((sum, value) => sum + value, 0) / durations.length)
+      ? durations.reduce((sum, value) => sum + value, 0) / durations.length
       : 5;
 
     // Calculate elapsed time for currently serving patient
