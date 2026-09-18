@@ -4,7 +4,6 @@ import { auth, onAuthStateChanged, User, signInWithEmailAndPassword, signOut } f
 import { GlobalHeader } from './components/GlobalHeader';
 import { useSiteConfig } from './lib/siteConfig';
 import { applyRouteMetadata } from './lib/seo';
-import { disableGa4, GA4_REDACTION_SETTINGS, syncGa4ForRoute, trackGa4PageView } from './lib/ga4';
 
 const LandingPage = lazy(() => import('./pages/LandingPage').then(({ LandingPage }) => ({ default: LandingPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
@@ -71,7 +70,7 @@ export const resolveAppPageForRoute = (path: string, userRole?: string | null): 
 };
 
 const isPublicRoute = (path: string) => {
-  return path === '/' || path === '/what-we-provide' || path === '/how-it-works' || path === '/why-choose-us' || path === '/benefits' || path === '/contact';
+  return path === '/' || path === '/login' || path === '/booking' || path.startsWith('/q/') || path === '/track' || path.startsWith('/track/') || path === '/what-we-provide' || path === '/how-it-works' || path === '/why-choose-us' || path === '/benefits' || path === '/contact';
 };
 
 export default function App() {
@@ -194,20 +193,7 @@ export default function App() {
   useEffect(() => {
     const path = routePathByPage[currentPage] || window.location.pathname || '/';
     applyRouteMetadata(path);
-
-    const isPublicPage = isPublicRoute(path);
-    const isPrivateRoute = !!userSession || path.startsWith('/site') || path.startsWith('/track') || path.startsWith('/q/') || path.startsWith('/booking') || path.startsWith('/login');
-
-    if (!isPublicPage || isPrivateRoute) {
-      disableGa4();
-      return;
-    }
-
-    syncGa4ForRoute(path);
-    if (GA4_REDACTION_SETTINGS.sendPageViews) {
-      trackGa4PageView(path);
-    }
-  }, [currentPage, userSession]);
+  }, [currentPage]);
 
   const handleNavigate = (page: string, role?: string) => {
     const effectiveRole = role || userSession?.role || '';
@@ -462,7 +448,7 @@ export default function App() {
               <div className="rounded-2xl border border-slate-800 bg-slate-900/75 p-5 shadow-2xl shadow-slate-950/40">
                 <div className="mb-5 text-center">
                   <div className="mb-3 flex items-center justify-center gap-2">
-                    <img src="/nextq-logo.png" alt="NEXTQ" className="h-24 w-64 object-contain" loading="lazy" decoding="async" />
+                    <img src="/nextq-logo.png" alt="NEXTQ" className="h-24 w-64 object-contain" />
                     <h1 className="text-3xl font-bold">NEXTQ</h1>
                   </div>
                   <div className="mb-2 inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">
@@ -646,7 +632,7 @@ export default function App() {
       {!isTvDisplay && <footer className="site-footer border-t border-slate-200 bg-white">
         <div className="site-footer-content">
           <div className="site-footer-brand">
-            <img src="/nextq-logo.png" alt="NEXTQ" className="site-footer-brand-logo" loading="lazy" decoding="async" />
+            <img src="/nextq-logo.png" alt="NEXTQ" className="site-footer-brand-logo" />
             <div className="site-footer-brand-copy-block">
               <span className="site-footer-brand-name">NEXTQ</span>
               <span className="site-footer-brand-tagline">Smart Queue. Less Waiting.</span>
@@ -663,7 +649,7 @@ export default function App() {
               className="site-footer-ybgp"
             >
               <span className="site-footer-ybgp-text">YBGP  — Your Business Growth Partner <span aria-hidden="true">→</span></span>
-              <img src="/ybgp-logo.png" alt="YBGP" className="site-footer-ybgp-logo" loading="lazy" decoding="async" />
+              <img src="/ybgp-logo.png" alt="YBGP" className="site-footer-ybgp-logo" />
             </a>
           </div>
         </div>
