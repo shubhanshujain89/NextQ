@@ -1164,6 +1164,73 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
         updatedAt: new Date().toISOString(),
       };
       if (formData.logo && !isValidImageDataUrl(formData.logo)) {
+        delete clinicPayload.logo;
+      }
+
+      console.log('Clinic payload:', clinicPayload);
+
+      if (editingClinic) {
+        await updateDoc(doc(db, 'clinics', editingClinic.id), clinicPayload);
+        void recordAuditEvent('Clinic modified', `${clinicPayload.name} was modified.`);
+        window.alert('Clinic updated successfully');
+      } else {
+        const response = await fetch('/api/admin/clinics', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...clinicPayload, createdAt: new Date().toISOString() }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || `Clinic creation failed (${response.status})`);
+        void recordAuditEvent('Clinic added', `${clinicPayload.name} was added.`);
+        window.alert('Clinic added successfully');
+      }
+      setShowAddModal(false);
+      setEditingClinic(null);
+      setCustomOperatingHours(parseOperatingHoursParts(DEFAULT_OPERATING_HOURS));
+      setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, avgConsultationMinutes: '10', featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
+      fetchClinics();
+    } catch (error) {
+      console.error('Error saving clinic:', error);
+      window.alert(`Unable to save clinic: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleSavePayment = async () => {
+    const clinicId = paymentForm.clinicId || clinics.find((clinic) => clinic.name.toLowerCase() === paymentForm.clinicName.trim().toLowerCase())?.id || '';
+    const clinicName = paymentForm.clinicName.trim() || clinics.find((clinic) => clinic.id === clinicId)?.name || '';
+    const amountValue = Number(paymentForm.amount);
+    const durationValue = Number(paymentForm.durationDays || 30);
+    const isTrialPack = paymentForm.pack === 'TRIAL';
+    if (!clinicName || !Number.isFinite(amountValue) || (amountValue <= 0 && !isTrialPack)) {
+      window.alert('Please choose a clinic and enter a valid amount before saving the payment.');
+      return;
+    }
+
+    try {
+      const startDateValue = new Date(`${paymentForm.fromDate}T00:00:00`);
+      if (Number.isNaN(startDateValue.getTime())) {
+        window.alert('Please select a valid from date.');
+        return;
+      }
+      const startDate = startDateValue.toISOString();
+      const expiryDate = calculateExpiryDate(startDateValue, durationValue).toISOString();
+      const paymentPayload = {
+        clinicId,
+        clinicName,
+        pack: paymentForm.pack,
+        ...(paymentForm.pack === 'TRIAL' ? { trialForPlan: paymentForm.trialForPlan } : {}),
+        amount: amountValue,
+        durationDays: durationValue,
+        status: paymentForm.status,
+        paidAt: startDate,
+        startDate,
+        expiryDate,
+        notes: paymentForm.notes.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      const matchedClinic = clinics.find((clinic) => clinic.id === clinicId || clinic.name.toLowerCase() === clinicName.toLowerCase());
+      if (matchedClinic) {
         const updatedPack = buildClinicPack(paymentForm.pack, startDate, 'ACTIVE');
         await updateDoc(doc(db, 'clinics', matchedClinic.id), {
           featurePlan: paymentForm.pack,
@@ -1180,24 +1247,14 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clinicId: matchedClinic.id, status: 'Granted' }),
         });
-        if (!accessResponse.ok) throw new Error('Unable to activate clinic after billing update.');
+        if (!accessResponse.ok) {
+          const accessPayload = await accessResponse.json().catch(() => ({}));
+          throw new Error(accessPayload?.error || 'Unable to activate clinic after billing update.');
+        }
       }
 
       if (editingPaymentId) {
         await updateDoc(doc(db, 'payments', editingPaymentId), paymentPayload);
-        setPayments((currentPayments) => currentPayments.map((payment) => payment.id === editingPaymentId ? {
-          ...payment,
-          clinicId,
-          clinicName,
-          pack: paymentForm.pack,
-          amount: amountValue,
-          durationDays: durationValue,
-          status: paymentForm.status,
-          paidAt: startDate,
-          startDate,
-          expiryDate: payment.expiryDate,
-          notes: paymentForm.notes.trim(),
-        } : payment));
         setEditingPaymentId(null);
         setBillingTab('overview');
         await fetchPayments();
@@ -1207,32 +1264,17 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
         return;
       }
 
-      const paymentRecord = await addDoc(collection(db, 'payments'), paymentPayload);
-
-      setPayments((currentPayments) => [{
-        id: paymentRecord.id,
-        clinicId,
-        clinicName,
-        pack: paymentForm.pack,
-        amount: amountValue,
-        durationDays: durationValue,
-        status: paymentForm.status,
-        paidAt: startDate,
-        startDate,
-        expiryDate,
-        notes: paymentForm.notes.trim(),
-      }, ...currentPayments]);
+      await addDoc(collection(db, 'payments'), paymentPayload);
       setEditingPaymentId(null);
       setPaymentForm({ clinicId: '', clinicName: '', pack: 'TRIAL', trialForPlan: 'BASIC', amount: '', fromDate: new Date().toISOString().slice(0, 10), durationDays: '30', status: 'PAID', notes: '' });
       setBillingTab('overview');
       await fetchPayments();
       void recordAuditEvent('Billing added', `Billing for ${clinicName} was added: ${paymentForm.pack}, ₹${amountValue.toLocaleString('en-IN')}, ${paymentForm.status}.`);
       fetchClinics();
-      fetchPayments();
       window.alert('Payment saved successfully.');
     } catch (error) {
       console.error('Error saving payment:', error);
-      window.alert('Unable to save the payment details. Please try again.');
+      window.alert(`Unable to save the payment details: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
