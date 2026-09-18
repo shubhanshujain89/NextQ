@@ -27,7 +27,7 @@ export const GA4_REDACTION_SETTINGS: {
   allowAdPersonalizationSignals: false,
   anonymizeIp: true,
   debug: env.VITE_GA4_DEBUG === 'true',
-  measurementId: env.VITE_GA_MEASUREMENT_ID || '',
+  measurementId: env.VITE_GA_MEASUREMENT_ID || 'G-GNP5Y7DSCM',
   allowedPublicRoutes: ['/', '/what-we-provide', '/how-it-works', '/why-choose-us', '/benefits', '/contact'],
   forbiddenKeys: ['phone', 'email', 'name', 'token', 'tracking', 'appointment', 'queue', 'clinic', 'patient', 'login', 'form', 'value', 'doctor', 'staff', 'user', 'id'],
   allowedEventNames: ['whatsapp_click', 'demo_click', 'contact_click', 'cta_click'],
