@@ -26,6 +26,8 @@ interface UserSession {
   clinicId?: string;
 }
 
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
+
 const normalizeRole = (value?: string | null) => String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
 
 export const resolveAppPageForRoute = (path: string, userRole?: string | null): AppPage => {
@@ -299,6 +301,28 @@ export default function App() {
     setCurrentPage('login');
     window.history.replaceState({}, '', '/login');
   };
+
+  useEffect(() => {
+    if (!userSession) return;
+
+    let inactivityTimer = window.setTimeout(handleLogout, INACTIVITY_TIMEOUT_MS);
+    const resetInactivityTimer = () => {
+      window.clearTimeout(inactivityTimer);
+      inactivityTimer = window.setTimeout(handleLogout, INACTIVITY_TIMEOUT_MS);
+    };
+    const activityEvents: Array<keyof WindowEventMap> = ['keydown', 'pointerdown', 'scroll', 'touchstart'];
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetInactivityTimer, { passive: true });
+    });
+
+    return () => {
+      window.clearTimeout(inactivityTimer);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetInactivityTimer);
+      });
+    };
+  }, [userSession]);
 
   const handleSaveProfile = () => {
     if (!userSession) return;

@@ -68,6 +68,7 @@ export const defaultContentSections: ContentSections = {
 
 const SETTINGS_KEY = 'nextq-site-settings';
 const CONTENT_KEY = 'nextq-site-content';
+let siteConfigSyncPromise: Promise<{ settings: SiteSettings; content: ContentSections }> | null = null;
 
 function parseStoredValue(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -143,11 +144,13 @@ export function loadContentSections(): ContentSections {
 }
 
 export async function saveSiteSettings(settings: SiteSettings) {
+  siteConfigSyncPromise = null;
   saveToLocalStorage(SETTINGS_KEY, settings);
   await saveToDatabase('site/settings', settings);
 }
 
 export async function saveContentSections(sections: ContentSections) {
+  siteConfigSyncPromise = null;
   saveToLocalStorage(CONTENT_KEY, sections);
   await saveToDatabase('site/content', sections);
 }
@@ -213,16 +216,20 @@ export async function loadContentSectionsFromDatabase(): Promise<ContentSections
 
 // Initialize site config from database on app startup
 export async function initializeSiteConfig(): Promise<{ settings: SiteSettings; content: ContentSections }> {
-  const [settings, content] = await Promise.all([
-    loadSiteSettingsFromDatabase(),
-    loadContentSectionsFromDatabase(),
-  ]);
+  if (!siteConfigSyncPromise) {
+    siteConfigSyncPromise = Promise.all([
+      loadSiteSettingsFromDatabase(),
+      loadContentSectionsFromDatabase(),
+    ]).then(([settings, content]) => {
+      // Also save to localStorage for immediate access
+      saveToLocalStorage(SETTINGS_KEY, settings);
+      saveToLocalStorage(CONTENT_KEY, content);
 
-  // Also save to localStorage for immediate access
-  saveToLocalStorage(SETTINGS_KEY, settings);
-  saveToLocalStorage(CONTENT_KEY, content);
+      return { settings, content };
+    });
+  }
 
-  return { settings, content };
+  return siteConfigSyncPromise;
 }
 
 export function useSiteConfig() {
