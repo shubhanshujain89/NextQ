@@ -1233,10 +1233,8 @@ app.post('/api/admin/clinics', async (req, res) => {
       subscriptionStartedAt: req.body?.subscriptionStartedAt ? new Date(req.body.subscriptionStartedAt) : new Date(),
       subscriptionExpiresAt: req.body?.subscriptionExpiresAt ? new Date(req.body.subscriptionExpiresAt) : undefined,
       specializations: Array.isArray(req.body?.specializations) ? req.body.specializations.join(', ') : String(req.body?.specializations || ''),
-      operatingHours: String(req.body?.operatingHours || ''),
       avgConsultationMinutes: Math.max(1, Number(req.body?.avgConsultationMinutes || 10)),
       logo: String(req.body?.logo || ''),
-      qrCodeUrl: String(req.body?.qrCodeUrl || ''),
     } as any);
 
     const accessKey = `clinic_access_${clinic.id}`;

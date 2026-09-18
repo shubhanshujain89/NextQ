@@ -1159,88 +1159,11 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
         subscriptionExpiresAt: subscriptionPack.expiryDate,
         subscriptionPack,
         specializations: formData.specializations.split(',').map(s => s.trim()).filter(Boolean),
-        operatingHours: formData.operatingHours,
         avgConsultationMinutes: Math.max(1, Number(formData.avgConsultationMinutes) || 10),
         logo: formData.logo || '',
-        qrCodeUrl: resolvedMode === 'site-admin' ? formData.qrCodeUrl.trim() : editingClinic?.qrCodeUrl || '',
         updatedAt: new Date().toISOString(),
       };
       if (formData.logo && !isValidImageDataUrl(formData.logo)) {
-        delete clinicPayload.logo;
-      }
-
-      console.log('Clinic payload:', clinicPayload);
-
-      if (editingClinic) {
-        await updateDoc(doc(db, 'clinics', editingClinic.id), clinicPayload);
-        console.log('Clinic updated:', editingClinic.id);
-        void recordAuditEvent('Clinic modified', `${clinicPayload.name} was modified.`);
-        window.alert('Clinic updated successfully');
-      } else {
-        const response = await fetch('/api/admin/clinics', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...clinicPayload,
-            createdAt: new Date().toISOString(),
-          }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload?.error || `Clinic creation failed (${response.status})`);
-        console.log('Clinic created:', payload.id);
-        void recordAuditEvent('Clinic added', `${clinicPayload.name} was added.`);
-        window.alert('Clinic added successfully');
-      }
-      setShowAddModal(false);
-      setEditingClinic(null);
-      setCustomOperatingHours(parseOperatingHoursParts(DEFAULT_OPERATING_HOURS));
-      setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, avgConsultationMinutes: '10', featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
-      fetchClinics();
-    } catch (error) {
-      console.error('Error saving clinic:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      window.alert(`Unable to save clinic: ${errorMessage}`);
-    }
-  };
-
-  const handleSavePayment = async () => {
-    const clinicId = paymentForm.clinicId || clinics.find((clinic) => clinic.name.toLowerCase() === paymentForm.clinicName.trim().toLowerCase())?.id || '';
-    const clinicName = paymentForm.clinicName.trim() || clinics.find((clinic) => clinic.id === clinicId)?.name || '';
-    const amountValue = Number(paymentForm.amount);
-    const durationValue = Number(paymentForm.durationDays || 30);
-
-    // Allow 0 amount for TRIAL pack, otherwise require positive amount
-    const isTrialPack = paymentForm.pack === 'TRIAL';
-    if (!clinicName || !Number.isFinite(amountValue) || (amountValue <= 0 && !isTrialPack)) {
-      window.alert('Please choose a clinic and enter a valid amount before saving the payment.');
-      return;
-    }
-
-    try {
-      const startDateValue = new Date(`${paymentForm.fromDate}T00:00:00`);
-      if (Number.isNaN(startDateValue.getTime())) {
-        window.alert('Please select a valid from date.');
-        return;
-      }
-      const startDate = startDateValue.toISOString();
-      const expiryDate = calculateExpiryDate(startDateValue, durationValue).toISOString();
-      const paymentPayload = {
-        clinicId,
-        clinicName,
-        pack: paymentForm.pack,
-        ...(paymentForm.pack === 'TRIAL' ? { trialForPlan: paymentForm.trialForPlan } : {}),
-        amount: amountValue,
-        durationDays: durationValue,
-        status: paymentForm.status,
-        paidAt: startDate,
-        startDate,
-        expiryDate,
-        notes: paymentForm.notes.trim(),
-        createdAt: new Date().toISOString(),
-      };
-      const matchedClinic = clinics.find((clinic) => clinic.id === clinicId || clinic.name.toLowerCase() === clinicName.toLowerCase());
-      if (matchedClinic) {
         const updatedPack = buildClinicPack(paymentForm.pack, startDate, 'ACTIVE');
         await updateDoc(doc(db, 'clinics', matchedClinic.id), {
           featurePlan: paymentForm.pack,
@@ -2873,81 +2796,6 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">Operating Hours</label>
-                <div className="rounded-xl border border-slate-600 bg-slate-700 p-3">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-300">Opening time</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={customOperatingHours.startHour}
-                          onChange={(e) => updateCustomOperatingHours('startHour', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
-                            <option key={hour} value={String(hour)}>{hour}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={customOperatingHours.startMinute}
-                          onChange={(e) => updateCustomOperatingHours('startMinute', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          {['00', '15', '30', '45'].map((minute) => (
-                            <option key={minute} value={minute}>{minute}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={customOperatingHours.startMeridian}
-                          onChange={(e) => updateCustomOperatingHours('startMeridian', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          <option value="AM">AM</option>
-                          <option value="PM">PM</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-300">Closing time</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={customOperatingHours.endHour}
-                          onChange={(e) => updateCustomOperatingHours('endHour', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
-                            <option key={hour} value={String(hour)}>{hour}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={customOperatingHours.endMinute}
-                          onChange={(e) => updateCustomOperatingHours('endMinute', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          {['00', '15', '30', '45'].map((minute) => (
-                            <option key={minute} value={minute}>{minute}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={customOperatingHours.endMeridian}
-                          onChange={(e) => updateCustomOperatingHours('endMeridian', e.target.value)}
-                          className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                        >
-                          <option value="AM">AM</option>
-                          <option value="PM">PM</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-                    Preview: <span className="font-semibold">{formData.operatingHours}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
                 <label className="block text-sm font-semibold mb-2">Clinic Photo</label>
                 <input
                   type="file"
@@ -2959,20 +2807,6 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
                   <img src={formData.logo} alt="Clinic preview" className="mt-3 h-20 w-20 object-cover rounded-lg border border-slate-600" />
                 )}
               </div>
-
-              {resolvedMode === 'site-admin' && (
-                <div>
-                  <label className="block text-sm font-semibold mb-2">TV Booking Barcode URL</label>
-                  <input
-                    type="url"
-                    value={formData.qrCodeUrl}
-                    onChange={(e) => setFormData({ ...formData, qrCodeUrl: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-emerald-400 focus:outline-none"
-                    placeholder="https://... or image data URL"
-                  />
-                  <p className="mt-1 text-xs text-slate-400">Shown on this clinic&apos;s TV display. Leave blank to use the placeholder.</p>
-                </div>
-              )}
 
             </div>
 
