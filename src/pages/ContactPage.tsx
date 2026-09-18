@@ -2,6 +2,7 @@ import React from 'react';
 import { Mail, MapPin, Phone, ArrowRight } from 'lucide-react';
 import { useSiteConfig } from '../lib/siteConfig';
 import { CommonCta } from '../components/CommonCta';
+import { trackGa4Event } from '../lib/ga4';
 
 interface Props {
   onNavigate: (page: string) => void;
@@ -83,6 +84,15 @@ export const ContactPage: React.FC<Props> = ({ onNavigate }) => {
                           href={actionHref}
                           target={actionHref.startsWith('http') ? '_blank' : undefined}
                           rel={actionHref.startsWith('http') ? 'noreferrer' : undefined}
+                          onClick={() => {
+                            if (title === 'WhatsApp') {
+                              trackGa4Event('whatsapp_click', { channel: 'contact_page' });
+                            } else if (title === 'Get in Touch') {
+                              trackGa4Event('contact_click', { channel: 'contact_page' });
+                            } else if (title === 'Call Us') {
+                              trackGa4Event('contact_click', { channel: 'call_link' });
+                            }
+                          }}
                         >
                           <ArrowRight className="h-4 w-4" /> {action}
                         </a>
