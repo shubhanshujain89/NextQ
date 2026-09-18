@@ -128,7 +128,7 @@ const getClinicAvailabilityStatus = (doctorList: Doctor[] = []) => {
     .filter((time): time is string => Boolean(time));
 
   if (!hasActiveSlot && nextSlot?.start) {
-    return { tone: 'warning' as const, label: `Not available until ${nextSlot.start}` };
+    return { tone: 'warning' as const, label: `Next available at ${nextSlot.start}` };
   }
 
   if (doctorList.length >= 2) {
