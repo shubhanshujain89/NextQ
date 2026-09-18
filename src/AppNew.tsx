@@ -70,7 +70,7 @@ export const resolveAppPageForRoute = (path: string, userRole?: string | null): 
 };
 
 const isPublicRoute = (path: string) => {
-  return path === '/login' || path === '/booking' || path.startsWith('/q/') || path === '/track' || path.startsWith('/track/') || path === '/what-we-provide' || path === '/how-it-works' || path === '/why-choose-us' || path === '/benefits' || path === '/contact';
+  return path === '/' || path === '/login' || path === '/booking' || path.startsWith('/q/') || path === '/track' || path.startsWith('/track/') || path === '/what-we-provide' || path === '/how-it-works' || path === '/why-choose-us' || path === '/benefits' || path === '/contact';
 };
 
 export default function App() {
@@ -84,7 +84,7 @@ export default function App() {
   const [siteAdminError, setSiteAdminError] = useState('');
   const [siteAdminShowPassword, setSiteAdminShowPassword] = useState(false);
   const [siteAdminLoading, setSiteAdminLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !isPublicRoute(window.location.pathname));
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({ displayName: '', photoURL: '', password: '', confirmPassword: '' });
 
