@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, MapPin, Phone, ArrowRight } from 'lucide-react';
 import { useSiteConfig } from '../lib/siteConfig';
+import { CommonCta } from '../components/CommonCta';
 
 interface Props {
   onNavigate: (page: string) => void;
@@ -91,9 +92,8 @@ export const ContactPage: React.FC<Props> = ({ onNavigate }) => {
                 ))}
               </div>
 
-              <div className="premium-why-footer-cta premium-contact-demo-cta" onClick={() => onNavigate('landing')}>
-                <p>Ready to simplify your clinic flow?</p>
-                <span>Start with NEXTQ <ArrowRight className="h-4 w-4" /></span>
+              <div className="premium-why-footer-cta">
+                <CommonCta />
               </div>
             </div>
           </section>

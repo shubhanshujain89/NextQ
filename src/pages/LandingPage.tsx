@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
-import { useSiteConfig } from '../lib/siteConfig';
+import { CommonCta } from '../components/CommonCta';
 
 interface LandingPageProps {
   onNavigate: (page: string, role?: string) => void;
@@ -38,8 +38,6 @@ const workflows = [
 ];
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
-  const { settings } = useSiteConfig();
-
   return (
     <div className="landing-page-shell min-h-screen text-slate-900">
     <main className="landing-main px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24">
@@ -49,10 +47,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <h1 className="landing-title">Smart Queue. Less Waiting.</h1>
             <p className="landing-subtitle">Clinic appointment management and live patient queue tracking for modern clinics.</p>
             <p className="landing-note">No app. No signup. Scan, book, get your token and track your turn live.</p>
-            <a className="premium-contact-demo-cta" href={settings.salesFormUrl} target="_blank" rel="noreferrer">
-              <p>Ready to simplify your clinic flow?</p>
-              <span>Start with NEXTQ <ArrowRight className="h-4 w-4" /></span>
-            </a>
+            <CommonCta />
           </div>
 
           <aside className="landing-dashboard-preview landing-hero-preview" aria-label="clinic queue dashboard preview">

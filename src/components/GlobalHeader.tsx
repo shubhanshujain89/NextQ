@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { useSiteConfig } from '../lib/siteConfig';
+import { CommonCta } from './CommonCta';
 
 interface GlobalHeaderProps {
   currentPage: string;
@@ -94,14 +95,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           </div>
 
           <div className="hidden shrink-0 items-center gap-2.5 md:flex">
-            <a
-              href={settings.salesFormUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-[10px] border border-[#1d9d8b] bg-transparent px-5 py-2.5 text-sm font-semibold text-[#0f766e] shadow-none"
-            >
-              Request a Demo →
-            </a>
+            <CommonCta />
             {isLoggedIn && (
               <>
                 <button

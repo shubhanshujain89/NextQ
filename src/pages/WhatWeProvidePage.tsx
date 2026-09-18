@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { CommonCta } from '../components/CommonCta';
 
 interface Props {
   onNavigate: (page: string) => void;
@@ -55,10 +55,7 @@ export const WhatWeProvidePage: React.FC<Props> = ({ onNavigate }) => (
       </section>
 
       <section className="premium-benefits-cta-wrap">
-        <button className="premium-contact-demo-cta premium-benefits-cta" onClick={() => onNavigate('landing')}>
-          <p>Ready to simplify your clinic flow?</p>
-          <span>Start with NEXTQ <ArrowRight className="h-4 w-4" /></span>
-        </button>
+        <CommonCta />
       </section>
     </main>
   </div>
