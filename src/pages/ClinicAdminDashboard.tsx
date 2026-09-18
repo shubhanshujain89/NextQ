@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as QRCode from 'qrcode';
-import { Building2, Plus, Edit, Trash2, Users, Clock, Search, Filter, Barcode, Link2, Unlink, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Users, Search, Filter, Barcode, Link2, Unlink, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where, orderBy, auth, onAuthStateChanged, recordAuditEvent, hashPassword } from '../lib/firebase';
 import { defaultContentSections, defaultSiteSettings, loadContentSections, loadSiteSettings, saveContentSections, saveSiteSettings, initializeSiteConfig, loadSiteSettingsFromDatabase, loadContentSectionsFromDatabase } from '../lib/siteConfig';
 import { FeaturePlan } from '../types/queue';
@@ -241,7 +241,7 @@ interface Clinic {
   phone: string;
   email: string;
   specializations: string[];
-  operatingHours: string;
+  operatingHours?: string;
   featurePlan?: FeaturePlan;
   subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'PAUSED';
   subscriptionStartedAt?: string;
@@ -422,7 +422,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
             phone: item.phone || '+91 ',
             email: item.email || '',
             specializations: normalizeSpecializations(item.specializations || item.specialty),
-            operatingHours: item.operatingHours || item.operating_hours || HOURS_OPTIONS[0],
+            operatingHours: String(item.operatingHours || item.operating_hours || '').trim() || undefined,
             avgConsultationMinutes: Number(item.avgConsultationMinutes || item.avg_consultation_minutes || 10),
             featurePlan,
             subscriptionStatus: getEffectiveSubscriptionStatus(item.subscriptionStatus || item.subscription_status || packRecord.status, packRecord.expiryDate),
@@ -606,7 +606,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
           phone: item.phone || '+91 ',
           email: item.email || '',
           specializations: normalizeSpecializations(item.specializations || item.specialty),
-          operatingHours: item.operatingHours || item.operating_hours || HOURS_OPTIONS[0],
+          operatingHours: String(item.operatingHours || item.operating_hours || '').trim() || undefined,
           avgConsultationMinutes: Number(item.avgConsultationMinutes || item.avg_consultation_minutes || 10),
           featurePlan,
           subscriptionStatus: getEffectiveSubscriptionStatus(item.subscriptionStatus || item.subscription_status || packRecord.status, packRecord.expiryDate),
@@ -1965,7 +1965,6 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
                       )}
                       <p>{clinic.phone}</p>
                       <p>{clinic.email}</p>
-                      <p className="flex items-center gap-2"><Clock className="h-4 w-4 text-emerald-400" /> {clinic.operatingHours}</p>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
