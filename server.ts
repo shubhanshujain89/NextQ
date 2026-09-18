@@ -1204,6 +1204,54 @@ app.get('/api/barcodes', async (req, res) => {
   }
 });
 
+app.post('/api/admin/clinics', async (req, res) => {
+  const context = await authContext(req);
+  if (!context || context.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Only Super Admin can create clinics.' });
+    return;
+  }
+
+  try {
+    const name = String(req.body?.name || '').trim();
+    const email = String(req.body?.email || '').trim();
+    const phone = String(req.body?.phone || '').trim();
+    if (!name || !email || !phone) {
+      res.status(400).json({ error: 'Clinic name, email, and phone are required.' });
+      return;
+    }
+
+    const clinic = await repositories.clinics.create({
+      id: crypto.randomUUID(),
+      name,
+      address: String(req.body?.address || '').trim(),
+      phone,
+      email,
+      featurePlan: ['TRIAL', 'BASIC'].includes(String(req.body?.featurePlan || 'TRIAL').toUpperCase())
+        ? String(req.body?.featurePlan || 'TRIAL').toUpperCase() as 'TRIAL' | 'BASIC'
+        : 'TRIAL',
+      subscriptionStatus: String(req.body?.subscriptionStatus || 'PAUSED').toUpperCase() as 'ACTIVE' | 'PAUSED',
+      subscriptionStartedAt: req.body?.subscriptionStartedAt ? new Date(req.body.subscriptionStartedAt) : new Date(),
+      subscriptionExpiresAt: req.body?.subscriptionExpiresAt ? new Date(req.body.subscriptionExpiresAt) : undefined,
+      specializations: Array.isArray(req.body?.specializations) ? req.body.specializations.join(', ') : String(req.body?.specializations || ''),
+      operatingHours: String(req.body?.operatingHours || ''),
+      logo: String(req.body?.logo || ''),
+      qrCodeUrl: String(req.body?.qrCodeUrl || ''),
+    } as any);
+
+    const accessKey = `clinic_access_${clinic.id}`;
+    const accessRecord = await repositories.settings.findOne({ key: accessKey, clinic_id: null });
+    if (!accessRecord) {
+      await repositories.settings.create({ id: crypto.randomUUID(), key: accessKey, value: 'Hold', category: 'clinic_access', clinicId: null } as any);
+    }
+    res.status(201).json({ id: clinic.id });
+  } catch (error) {
+    console.error('Clinic creation error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    const isDuplicate = /duplicate|already exists|unique/i.test(message);
+    res.status(isDuplicate ? 409 : 500).json({ error: isDuplicate ? 'A clinic with these details already exists.' : `Unable to create clinic: ${message}` });
+  }
+});
+
 app.post('/api/barcodes', async (req, res) => {
   const context = await authContext(req);
   if (!context || context.role !== 'SUPER_ADMIN') {

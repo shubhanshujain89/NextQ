@@ -19,7 +19,7 @@ export const getDashboardTabs = (mode: DashboardMode): DashboardTab[] => {
       ...commonTabs.slice(0, 2),
       { key: 'content', label: 'Website Content' },
       ...commonTabs.slice(2, 3),
-      { key: 'barcode-inventory', label: 'Barcode Inventory' },
+      { key: 'barcode-inventory', label: 'QR Code Inventory' },
       ...commonTabs.slice(3),
     ];
   }

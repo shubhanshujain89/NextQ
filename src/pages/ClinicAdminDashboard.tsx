@@ -1172,11 +1172,18 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
         void recordAuditEvent('Clinic modified', `${clinicPayload.name} was modified.`);
         window.alert('Clinic updated successfully');
       } else {
-        const docRef = await addDoc(collection(db, 'clinics'), {
-          ...clinicPayload,
-          createdAt: new Date().toISOString()
+        const response = await fetch('/api/admin/clinics', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...clinicPayload,
+            createdAt: new Date().toISOString(),
+          }),
         });
-        console.log('Clinic created:', docRef.id);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || `Clinic creation failed (${response.status})`);
+        console.log('Clinic created:', payload.id);
         void recordAuditEvent('Clinic added', `${clinicPayload.name} was added.`);
         window.alert('Clinic added successfully');
       }
@@ -2012,8 +2019,8 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">Super Admin tools</div>
-                  <h3 className="mt-2 text-2xl font-bold text-white">Barcode Inventory</h3>
-                  <p className="mt-1 text-sm text-slate-400">Create unique Code 39 barcodes and assign one barcode to each doctor.</p>
+                  <h3 className="mt-2 text-2xl font-bold text-white">QR Code Inventory</h3>
+                  <p className="mt-1 text-sm text-slate-400">Create unique QR codes and assign one QR code to each doctor.</p>
                 </div>
                 <Barcode className="h-8 w-8 text-emerald-400" />
               </div>
