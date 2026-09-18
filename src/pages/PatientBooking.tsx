@@ -149,6 +149,12 @@ const getClinicTimingLabel = (clinic: Clinic, doctorList: Doctor[] = []) => {
   return doctorTimings.join(', ') || clinic.operatingHours || 'Doctor timings not configured';
 };
 
+const getDoctorAvailabilityLabel = (doctor: Doctor) => {
+  const schedule = getEarliestBookingSchedule(doctor);
+  if (schedule) return `${doctor.availableDays?.slice(0, 3).join(', ')}${doctor.availableDays?.length > 3 ? ', +more' : ''}`;
+  return parseDoctorSlots(doctor.availableHours || '').length ? 'Timing ended today' : 'Timing not configured';
+};
+
 export const buildBookingSelectionUrl = (
   clinicId?: string,
   doctorId?: string,
@@ -680,7 +686,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
                         <Clock className="w-4 h-4 text-emerald-400" />
                         {doctor.availableHours}
                       </div>
-                        <p>{getEarliestBookingSchedule(doctor) ? `${doctor.availableDays?.slice(0, 3).join(', ')}${doctor.availableDays?.length > 3 ? ', +more' : ''}` : 'Not available today'}</p>
+                        <p>{getDoctorAvailabilityLabel(doctor)}</p>
                     </div>
 
                   </button>
