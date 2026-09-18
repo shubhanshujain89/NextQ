@@ -459,7 +459,7 @@ app.get('/api/staff/queue/:clinicId', async (req, res) => {
       : activeDoctors;
     const displayedDoctor = context.role === 'DOCTOR'
       ? scopedDoctors[0]
-      : scopedActiveDoctors[0];
+      : scopedActiveDoctors.find((doctor) => String(doctor.availableHours || '').trim()) || scopedActiveDoctors[0];
     const tokens = session
       ? (await Promise.all(scopedDoctors.map((doctor) => repositories.tokens.findByDoctorAndSession(doctor.id, session.id)))).flat()
       : [];

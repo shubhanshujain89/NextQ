@@ -272,7 +272,7 @@ export class BookingService {
     if (!appointmentSlot) {
       throw new Error('Select an appointment timing for this doctor.');
     }
-    if (appointmentSlot && !configuredSlots.some((slot) => slot.toLowerCase() === appointmentSlot.toLowerCase())) {
+    if (!isBookingSlotAvailable(doctor.availableHours || '', appointmentSlot, today, clinic.timezone)) {
       throw new Error('Select a valid appointment timing.');
     }
 
