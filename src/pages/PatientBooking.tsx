@@ -142,6 +142,13 @@ const getClinicAvailabilityStatus = (doctorList: Doctor[] = []) => {
   return { tone: 'success' as const, label: `Next available: ${availableStarts[0]}` };
 };
 
+const getClinicTimingLabel = (clinic: Clinic, doctorList: Doctor[] = []) => {
+  const doctorTimings = Array.from(new Set(
+    doctorList.flatMap((doctor) => parseDoctorSlots(doctor.availableHours || '').map((slot) => slot.label))
+  ));
+  return doctorTimings.join(', ') || clinic.operatingHours || 'Doctor timings not configured';
+};
+
 export const buildBookingSelectionUrl = (
   clinicId?: string,
   doctorId?: string,
@@ -542,6 +549,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
               {filteredClinics.map(clinic => {
                 const availability = clinicAvailability[clinic.id] || { tone: 'warning' as const, label: 'Moderate wait' };
                 const isAvailable = availability.tone === 'success';
+                const timingLabel = getClinicTimingLabel(clinic, clinicDoctors[clinic.id] || []);
 
                 return (
                   <button
@@ -571,7 +579,7 @@ export const PatientBooking: React.FC<PatientBookingProps> = ({ onBack }) => {
                       </div>
                       <div className="flex items-center gap-3">
                         <Clock className="h-4 w-4 text-emerald-600" />
-                        <span>{clinic.operatingHours}</span>
+                        <span>{timingLabel}</span>
                       </div>
                     </div>
 
