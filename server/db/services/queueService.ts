@@ -95,13 +95,14 @@ export const calculateConsultationDurationSeconds = (
   return Math.min(Math.max(1, elapsedSeconds), 60 * 60);
 };
 
-export const calculateAverageConsultationMinutes = (durationsSeconds: Array<number | string>): number => {
+export const calculateAverageConsultationMinutes = (durationsSeconds: Array<number | string>, fallbackMinutes = 10): number => {
   const normalized = durationsSeconds
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0)
     .map((value) => value / 60);
 
-  if (!normalized.length) return 10;
+  const normalizedFallback = Number(fallbackMinutes);
+  if (!normalized.length) return Number.isFinite(normalizedFallback) && normalizedFallback > 0 ? normalizedFallback : 10;
 
   const total = normalized.reduce((sum, value) => sum + value, 0);
   return Number((total / normalized.length).toFixed(1));
@@ -486,9 +487,11 @@ export class QueueService {
       const [tokenRows] = await connection.execute(
         `SELECT t.id, t.clinic_id, t.session_id, t.doctor_id, t.token_number,
           t.status, t.called_at,
-          TIMESTAMPDIFF(SECOND, t.called_at, CURRENT_TIMESTAMP) AS elapsed_seconds
+          TIMESTAMPDIFF(SECOND, t.called_at, CURRENT_TIMESTAMP) AS elapsed_seconds,
+          c.avg_consultation_minutes
          FROM \`tokens\` t
          JOIN \`sessions\` s ON s.id = t.session_id
+         JOIN \`clinics\` c ON c.id = t.clinic_id
          WHERE t.id = ? AND t.clinic_id = ? AND s.clinic_id = ? AND s.status = 'ACTIVE'
          FOR UPDATE`,
         [tokenId, clinicId, clinicId]
@@ -512,13 +515,13 @@ export class QueueService {
       const [durationRows] = await connection.execute(
         `SELECT consultation_duration_seconds
          FROM \`tokens\`
-         WHERE clinic_id = ? AND session_id = ? AND doctor_id = ?
+         WHERE clinic_id = ? AND doctor_id = ?
            AND status = 'COMPLETED' AND consultation_duration_seconds > 0
          ORDER BY completed_at DESC LIMIT 5`,
-        [clinicId, token.session_id, token.doctor_id]
+        [clinicId, token.doctor_id]
       );
       const durations = (durationRows as any[]).map((row) => Number(row.consultation_duration_seconds));
-      const rollingAverage = calculateAverageConsultationMinutes(durations);
+      const rollingAverage = calculateAverageConsultationMinutes(durations, Number(token.avg_consultation_minutes));
 
       const [nextRows] = await connection.execute(
         `SELECT id, token_number

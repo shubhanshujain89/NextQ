@@ -28,6 +28,7 @@ test('queue consultation lifecycle yields a sensible duration and ETA update', (
     10 * 60,
   ]);
   assert.equal(averageMinutes, 8.5);
+  assert.equal(calculateAverageConsultationMinutes([], 15), 15);
 
   const eta = estimateQueueWaitMinutes({
     patientsAhead: 3,

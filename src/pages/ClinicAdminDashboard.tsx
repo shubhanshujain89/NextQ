@@ -259,6 +259,7 @@ interface Clinic {
   } | null;
   logo?: string;
   qrCodeUrl?: string;
+  avgConsultationMinutes: number;
   createdAt: string;
 }
 
@@ -302,6 +303,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
     email: '',
     specializations: '',
     operatingHours: DEFAULT_OPERATING_HOURS,
+    avgConsultationMinutes: '10',
     featurePlan: 'TRIAL' as FeaturePlan,
     logo: '',
     qrCodeUrl: ''
@@ -421,6 +423,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
             email: item.email || '',
             specializations: normalizeSpecializations(item.specializations || item.specialty),
             operatingHours: item.operatingHours || item.operating_hours || HOURS_OPTIONS[0],
+            avgConsultationMinutes: Number(item.avgConsultationMinutes || item.avg_consultation_minutes || 10),
             featurePlan,
             subscriptionStatus: getEffectiveSubscriptionStatus(item.subscriptionStatus || item.subscription_status || packRecord.status, packRecord.expiryDate),
             subscriptionStartedAt: item.subscriptionStartedAt || item.subscription_started_at || packRecord.startDate,
@@ -604,6 +607,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
           email: item.email || '',
           specializations: normalizeSpecializations(item.specializations || item.specialty),
           operatingHours: item.operatingHours || item.operating_hours || HOURS_OPTIONS[0],
+          avgConsultationMinutes: Number(item.avgConsultationMinutes || item.avg_consultation_minutes || 10),
           featurePlan,
           subscriptionStatus: getEffectiveSubscriptionStatus(item.subscriptionStatus || item.subscription_status || packRecord.status, packRecord.expiryDate),
           subscriptionStartedAt: item.subscriptionStartedAt || item.subscription_started_at || packRecord.startDate,
@@ -1156,6 +1160,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
         subscriptionPack,
         specializations: formData.specializations.split(',').map(s => s.trim()).filter(Boolean),
         operatingHours: formData.operatingHours,
+        avgConsultationMinutes: Math.max(1, Number(formData.avgConsultationMinutes) || 10),
         logo: formData.logo || '',
         qrCodeUrl: resolvedMode === 'site-admin' ? formData.qrCodeUrl.trim() : editingClinic?.qrCodeUrl || '',
         updatedAt: new Date().toISOString(),
@@ -1190,7 +1195,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       setShowAddModal(false);
       setEditingClinic(null);
       setCustomOperatingHours(parseOperatingHoursParts(DEFAULT_OPERATING_HOURS));
-      setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
+      setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, avgConsultationMinutes: '10', featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
       fetchClinics();
     } catch (error) {
       console.error('Error saving clinic:', error);
@@ -1331,6 +1336,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
       email: clinic.email || '',
       specializations: Array.isArray(clinic.specializations) ? clinic.specializations.join(', ') : (typeof clinic.specializations === 'string' ? clinic.specializations : ''),
       operatingHours: clinic.operatingHours || DEFAULT_OPERATING_HOURS,
+      avgConsultationMinutes: String(clinic.avgConsultationMinutes || 10),
       featurePlan: clinic.featurePlan || 'TRIAL',
       logo: clinic.logo || '',
       qrCodeUrl: clinic.qrCodeUrl || ''
@@ -1341,7 +1347,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
   const openAddClinicModal = () => {
     setEditingClinic(null);
     setCustomOperatingHours(parseOperatingHoursParts(DEFAULT_OPERATING_HOURS));
-    setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
+    setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, avgConsultationMinutes: '10', featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
     setShowAddModal(true);
   };
 
@@ -2852,6 +2858,21 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
               </div>
 
               <div>
+                <label className="block text-sm font-semibold mb-2">Default consultation time (minutes)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  step="1"
+                  value={formData.avgConsultationMinutes}
+                  onChange={(e) => setFormData({ ...formData, avgConsultationMinutes: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-emerald-400 focus:outline-none"
+                  placeholder="10"
+                />
+                <p className="mt-1 text-xs text-slate-400">Used until completed-patient history is available. After that, estimates use the latest 5 consultations.</p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold mb-2">Operating Hours</label>
                 <div className="rounded-xl border border-slate-600 bg-slate-700 p-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -2961,7 +2982,7 @@ export const ClinicAdminDashboard: React.FC<ClinicAdminProps> = ({ adminId, onLo
                   setShowAddModal(false);
                   setEditingClinic(null);
                   setCustomOperatingHours(parseOperatingHoursParts(DEFAULT_OPERATING_HOURS));
-                  setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
+                  setFormData({ name: '', address: '', phone: '+91 ', email: '', specializations: '', operatingHours: DEFAULT_OPERATING_HOURS, avgConsultationMinutes: '10', featurePlan: 'TRIAL', logo: '', qrCodeUrl: '' });
                 }}
                 className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition"
               >

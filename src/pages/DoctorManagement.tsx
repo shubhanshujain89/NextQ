@@ -124,10 +124,20 @@ export const DoctorManagement: React.FC<DoctorManagementProps> = ({ clinicId, cl
         });
         void recordAuditEvent('Doctor modified', `${doctorData.name} was modified for ${clinicName}.`);
       } else {
-        await addDoc(collection(db, 'doctors'), {
-          ...doctorData,
-          createdAt: new Date().toISOString()
+        const password = window.prompt('Set the doctor login password (at least 12 characters):', '');
+        if (!password) return;
+        if (password.length < 12) {
+          window.alert('Password must be at least 12 characters.');
+          return;
+        }
+        const response = await fetch('/api/admin/doctors', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...doctorData, password }),
         });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || `Doctor creation failed (${response.status})`);
         void recordAuditEvent('Doctor added', `${doctorData.name} was added to ${clinicName}.`);
       }
 

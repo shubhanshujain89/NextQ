@@ -3,7 +3,7 @@ import * as QRCode from 'qrcode';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { getDatabase, readDoc, listQuery, writeDoc, updateDoc, deleteDoc, findUserByEmail, verifyPassword, createPublicBooking, resetUserPassword, extractTableName } from './server/db.js';
+import { getDatabase, readDoc, listQuery, writeDoc, updateDoc, deleteDoc, findUserByEmail, hashPassword, verifyPassword, createPublicBooking, resetUserPassword, extractTableName } from './server/db.js';
 import { executeQuery, executeQueryOne } from './server/db/connection.js';
 import { repositories } from './server/db/repositories/index.js';
 import { services } from './server/db/services/index.js';
@@ -1234,6 +1234,7 @@ app.post('/api/admin/clinics', async (req, res) => {
       subscriptionExpiresAt: req.body?.subscriptionExpiresAt ? new Date(req.body.subscriptionExpiresAt) : undefined,
       specializations: Array.isArray(req.body?.specializations) ? req.body.specializations.join(', ') : String(req.body?.specializations || ''),
       operatingHours: String(req.body?.operatingHours || ''),
+      avgConsultationMinutes: Math.max(1, Number(req.body?.avgConsultationMinutes || 10)),
       logo: String(req.body?.logo || ''),
       qrCodeUrl: String(req.body?.qrCodeUrl || ''),
     } as any);
@@ -1249,6 +1250,99 @@ app.post('/api/admin/clinics', async (req, res) => {
     const message = error instanceof Error ? error.message : String(error);
     const isDuplicate = /duplicate|already exists|unique/i.test(message);
     res.status(isDuplicate ? 409 : 500).json({ error: isDuplicate ? 'A clinic with these details already exists.' : `Unable to create clinic: ${message}` });
+  }
+});
+
+app.post('/api/admin/doctors', async (req, res) => {
+  const context = await authContext(req);
+  const clinicId = String(req.body?.clinicId || '').trim();
+  if (!context || !['SUPER_ADMIN', 'CLINIC_ADMIN'].includes(context.role)) {
+    res.status(403).json({ error: 'Only clinic administrators can create doctors.' });
+    return;
+  }
+  if (context.role !== 'SUPER_ADMIN' && context.clinicId !== clinicId) {
+    res.status(403).json({ error: 'Clinic access denied.' });
+    return;
+  }
+
+  try {
+    const name = String(req.body?.name || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    const clinic = await repositories.clinics.findById(clinicId);
+    if (!clinic) {
+      res.status(404).json({ error: 'Clinic not found.' });
+      return;
+    }
+    const plan = getClinicPlanSnapshot(clinic);
+    if (context.role !== 'SUPER_ADMIN' && plan.status !== 'ACTIVE') {
+      res.status(403).json({ error: `Clinic subscription is ${plan.status.toLowerCase()}. Please renew the ${plan.plan} plan.` });
+      return;
+    }
+    if (!name || !email || password.length < 12) {
+      res.status(400).json({ error: 'Doctor name, email, and a password of at least 12 characters are required.' });
+      return;
+    }
+    const existingUser = await repositories.staffUsers.findByEmail(email);
+    if (existingUser) {
+      res.status(409).json({ error: 'A user with this email already exists.' });
+      return;
+    }
+    const existingDoctor = await repositories.doctors.findByEmail(email);
+    if (existingDoctor) {
+      res.status(409).json({ error: 'A doctor with this email already exists.' });
+      return;
+    }
+    const doctors = await repositories.doctors.findByClinicId(clinicId);
+    if (context.role !== 'SUPER_ADMIN' && doctors.length >= plan.maxDoctors) {
+      res.status(403).json({ error: `${plan.plan} plan allows up to ${plan.maxDoctors} doctor${plan.maxDoctors === 1 ? '' : 's'}.` });
+      return;
+    }
+
+    const doctor = await repositories.doctors.create({
+      id: crypto.randomUUID(),
+      clinicId,
+      name,
+      specialization: String(req.body?.specialization || ''),
+      qualification: String(req.body?.qualification || ''),
+      experience: String(req.body?.experience || ''),
+      phone: String(req.body?.phone || ''),
+      email,
+      photo: String(req.body?.photo || ''),
+      bio: String(req.body?.bio || ''),
+      consultationFee: Number(req.body?.consultationFee || 0),
+      availableDays: Array.isArray(req.body?.availableDays) ? req.body.availableDays : [],
+      availableHours: String(req.body?.availableHours || ''),
+      rating: Number(req.body?.rating || 0),
+      status: req.body?.status === 'inactive' ? 'inactive' : 'active',
+    } as any);
+
+    try {
+      await repositories.staffUsers.create({
+        id: crypto.randomUUID(),
+        clinicId,
+        doctorId: doctor.id,
+        email,
+        passwordHash: hashPassword(password),
+        role: 'DOCTOR',
+        displayName: name,
+        name,
+        phone: String(req.body?.phone || ''),
+        status: 'Active',
+        clinicName: clinic.name,
+        accessStatus: 'Granted',
+      } as any);
+    } catch (error) {
+      await repositories.doctors.delete(doctor.id).catch(() => undefined);
+      throw error;
+    }
+
+    res.status(201).json({ id: doctor.id });
+  } catch (error) {
+    console.error('Doctor creation error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    const isDuplicate = /duplicate|already exists|unique/i.test(message);
+    res.status(isDuplicate ? 409 : 500).json({ error: isDuplicate ? 'A doctor or user with these details already exists.' : `Unable to create doctor: ${message}` });
   }
 });
 
