@@ -95,7 +95,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({
           </div>
 
           <div className="hidden shrink-0 items-center gap-2.5 md:flex">
-            <CommonCta />
+            <CommonCta label="Book a Demo" compact />
             {isLoggedIn && (
               <>
                 <button

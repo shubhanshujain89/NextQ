@@ -90,9 +90,11 @@ test('auth transitions keep clinic-admin users on the protected dashboard route'
 test('contact page WhatsApp link carries a configurable prefilled message that mirrors the settings model', () => {
   const siteConfigSource = readFileSync(new URL('./lib/siteConfig.ts', import.meta.url), 'utf8');
   const contactPageSource = readFileSync(new URL('./pages/ContactPage.tsx', import.meta.url), 'utf8');
+  const serverSource = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 
   assert.ok(siteConfigSource.includes('whatsappMessage:'));
   assert.ok(contactPageSource.includes('encodeURIComponent(settings.whatsappMessage'));
+  assert.ok(serverSource.includes("'whatsappMessage'"));
 });
 
 test('how it works page explains the patient queue workflow instead of duplicating service capabilities', () => {

@@ -92,7 +92,7 @@ export const ContactPage: React.FC<Props> = ({ onNavigate }) => {
                 ))}
               </div>
 
-              <div className="premium-why-footer-cta">
+              <div className="premium-benefits-cta-wrap">
                 <CommonCta />
               </div>
             </div>

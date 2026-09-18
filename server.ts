@@ -1898,7 +1898,7 @@ app.get('/api/site/settings', async (_req, res) => {
   try {
     const publicSettingKeys = new Set([
       'siteName', 'siteTagline', 'contactEmail', 'contactPhone', 'whatsappNumber',
-      'supportAddress', 'facebookUrl', 'instagramUrl', 'linkedinUrl', 'xUrl',
+      'whatsappMessage', 'supportAddress', 'facebookUrl', 'instagramUrl', 'linkedinUrl', 'xUrl',
       'youtubeUrl', 'freeTrialFormUrl', 'salesFormUrl', 'heroTitle', 'heroSubtitle',
       'whatsappEnabled', 'clinicAccessLabel',
     ]);
